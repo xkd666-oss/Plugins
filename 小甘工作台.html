@@ -188,8 +188,6 @@ header p { color: var(--text-secondary); font-size: 12px; }
 .status-pill{padding:4px 8px;border-radius:99px;background:rgba(120,120,128,.15);font-size:11px}
 .status-pill.ok{color:#34C759}
 .status-pill.warn{color:#FF9F0A}
-.mask-tools{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
-.mask-tools .tool-btn{min-height:30px;padding:5px 8px}
 .layer-actions{display:flex;gap:4px;margin-top:4px}
 .layer-actions button{flex:1;min-height:25px;background:rgba(120,120,128,.15);color:#fff;border:1px solid var(--card-border);border-radius:6px;font-size:11px}
 
@@ -212,13 +210,6 @@ body.canvas-editor-open { overflow: hidden; padding-bottom: 0; }
 .editor-stage .canvas-block { width: min(100%, 1200px); height: 100%; justify-content: center; }
 .editor-stage .canvas-container { width: 100%; height: 100%; aspect-ratio: auto;
     max-height: none; flex: 1 1 auto; }
-.editor-toolbar-wrap { flex: 0 0 auto; padding: 8px 12px 12px;
-    background: rgba(18,18,20,.97); border-top: 1px solid var(--card-border);
-    box-shadow: 0 -12px 35px rgba(0,0,0,.35); }
-.editor-toolbar-wrap .canvas-toolbar,
-.editor-toolbar-wrap .mask-tools { max-width: 1200px; margin-left: auto; margin-right: auto; }
-.editor-toolbar-wrap .canvas-toolbar { background: transparent; border: 0; padding: 0; }
-.editor-toolbar-wrap .mask-tools { margin-top: 6px; }
 .canvas-entry-card { display: flex; align-items: center; justify-content: space-between;
     gap: 12px; padding: 12px; border: 1px solid var(--card-border);
     border-radius: 12px; background: rgba(0,0,0,.22); }
@@ -226,16 +217,103 @@ body.canvas-editor-open { overflow: hidden; padding-bottom: 0; }
 .canvas-entry-info b { display:block; font-size:13px; margin-bottom:3px; }
 .canvas-entry-info span { color:var(--text-secondary); font-size:11px; }
 .editor-open-btn { white-space: nowrap; }
+
+/* ===== 主工具栏（常驻） ===== */
+.editor-main-toolbar {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    background: rgba(18,18,20,.97);
+    border-top: 1px solid var(--card-border);
+}
+.editor-main-toolbar .canvas-toolbar {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    flex-wrap: wrap;
+}
+
+/* ===== 底部折叠抽屉：更多工具 ===== */
+.editor-drawer {
+    flex: 0 0 auto;
+    background: rgba(18,18,20,.97);
+    border-top: 1px solid var(--card-border);
+    box-shadow: 0 -8px 25px rgba(0,0,0,.3);
+    transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    max-height: 440px;
+    overflow: hidden;
+}
+.editor-drawer.collapsed {
+    max-height: 44px;
+}
+.editor-drawer-header {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    cursor: pointer;
+    user-select: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s;
+}
+.editor-drawer:not(.collapsed) .editor-drawer-header {
+    border-bottom-color: var(--card-border);
+}
+.editor-drawer-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.editor-drawer-icon {
+    font-size: 11px;
+    color: var(--text-secondary);
+    transition: transform 0.2s;
+}
+.editor-drawer-body {
+    padding: 10px 12px 12px;
+    max-width: 1200px;
+    margin: 0 auto;
+    overflow-y: auto;
+    max-height: 396px;
+}
+.drawer-section {
+    margin-bottom: 12px;
+}
+.drawer-section:last-child {
+    margin-bottom: 0;
+}
+.drawer-section-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    margin-bottom: 6px;
+}
+.drawer-section .canvas-toolbar {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    flex-wrap: wrap;
+}
+.view-status-label,
+.zoom-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    align-self: center;
+    min-width: 42px;
+    text-align: center;
+    padding: 0 4px;
+}
+
 @media (max-width: 600px) {
     .editor-topbar { height:48px; min-height:48px; padding:6px 8px; }
     .editor-stage { padding:6px; }
     .editor-stage .canvas-container { height:100%; min-height:0; border-radius:10px; }
-    .editor-toolbar-wrap { padding:7px 7px calc(7px + env(safe-area-inset-bottom)); }
-    .editor-toolbar-wrap .canvas-toolbar,
-    .editor-toolbar-wrap .mask-tools { overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none; }
-    .editor-toolbar-wrap .canvas-toolbar::-webkit-scrollbar,
-    .editor-toolbar-wrap .mask-tools::-webkit-scrollbar { display:none; }
-    .editor-toolbar-wrap .tool-btn { flex:0 0 auto; min-height:34px; padding:6px 9px; }
     .canvas-entry-card { padding:10px; }
     .canvas-entry-info span { display:block; max-width:220px; line-height:1.35; }
     body { padding: 6px 6px 180px 6px; }
@@ -262,6 +340,32 @@ body.canvas-editor-open { overflow: hidden; padding-bottom: 0; }
     .action-bar > div { display: flex; width: 100%; gap: 6px; flex-wrap: wrap; }
     .action-bar > div > button { flex: 1; }
     .annotation-card { max-width: 160px; font-size: 10px; }
+
+    /* 主工具栏移动端 */
+    .editor-main-toolbar { padding: 6px 8px; }
+    .editor-main-toolbar .canvas-toolbar {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        scrollbar-width: none;
+    }
+    .editor-main-toolbar .canvas-toolbar::-webkit-scrollbar { display: none; }
+    .editor-main-toolbar .tool-btn { flex: 0 0 auto; min-height: 34px; padding: 6px 9px; }
+
+    /* 抽屉移动端 */
+    .editor-drawer { max-height: 60vh; }
+    .editor-drawer.collapsed { max-height: 44px; }
+    .editor-drawer-header { height: 44px; padding: 0 12px; }
+    .editor-drawer-body {
+        padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+        max-height: calc(60vh - 44px);
+    }
+    .drawer-section .canvas-toolbar {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        scrollbar-width: none;
+    }
+    .drawer-section .canvas-toolbar::-webkit-scrollbar { display: none; }
+    .drawer-section .tool-btn { flex: 0 0 auto; min-height: 32px; padding: 6px 9px; }
 }
 @media (max-width: 600px) and (orientation: landscape) {
     .canvas-container { height: min(62svh, 420px); min-height: 180px; }
@@ -418,42 +522,79 @@ body.canvas-editor-open { overflow: hidden; padding-bottom: 0; }
                 </div>
                 <div class="annotation-layer" id="annotationLayer"></div>
             </div>
+        </div>
+    </div>
 
-            <div class="canvas-toolbar">
-                <button class="tool-btn" id="brushBtn" onclick="setTool('brush')">🖌️ 涂刷</button>
-                <button class="tool-btn" id="lassoBtn" onclick="setTool('lasso')">➰ 套索</button>
-                <button class="tool-btn" id="polygonBtn" onclick="setTool('polygon')">📐 多边形</button>
-                <button class="tool-btn" id="finishPolyBtn" style="display:none; background:#30D158;" onclick="finishPolygon()">✅ 完成</button>
-                <button class="tool-btn" id="eraserBtn" onclick="setTool('eraser')">🧹 橡皮擦</button>
-                <button class="tool-btn" id="annoBtn" onclick="setTool('annotate')" style="background:rgba(255,159,10,0.25);">🏷️ 打标签</button>
-                <button class="tool-btn" onclick="undoMask()">↩️ 撤销</button>
-                <button class="tool-btn" onclick="redoMask()">↪️ 重做</button>
-                <button class="tool-btn" onclick="clearCurrentMask()">清空当前蒙版</button>
-                <span id="brushSizeContainer" style="display:flex; align-items:center; gap:4px; margin-left:auto;">
-                    <span style="font-size:12px; color:var(--text-secondary);">笔触:</span>
-                    <input type="range" id="brushSize" min="5" max="100" value="20" style="width: 80px;">
-                </span>
+    <!-- 常驻主工具栏：核心绘制 + 编辑操作 -->
+    <div class="editor-main-toolbar">
+        <div class="canvas-toolbar">
+            <button class="tool-btn" id="brushBtn" onclick="setTool('brush')">🖌️ 涂刷</button>
+            <button class="tool-btn" id="lassoBtn" onclick="setTool('lasso')">➰ 套索</button>
+            <button class="tool-btn" id="polygonBtn" onclick="setTool('polygon')">📐 多边形</button>
+            <button class="tool-btn" id="finishPolyBtn" style="display:none; background:#30D158;" onclick="finishPolygon()">✅ 完成</button>
+            <button class="tool-btn" id="eraserBtn" onclick="setTool('eraser')">🧹 橡皮擦</button>
+            <button class="tool-btn" id="annoBtn" onclick="setTool('annotate')" style="background:rgba(255,159,10,0.25);">🏷️ 打标签</button>
+            <button class="tool-btn" onclick="undoMask()">↩️ 撤销</button>
+            <button class="tool-btn" onclick="redoMask()">↪️ 重做</button>
+            <button class="tool-btn" onclick="clearCurrentMask()">清空当前蒙版</button>
+        </div>
+    </div>
+
+    <!-- 底部折叠抽屉：更多工具 -->
+    <div class="editor-drawer collapsed" id="editorDrawer">
+        <div class="editor-drawer-header" onclick="toggleEditorDrawer()">
+            <span class="editor-drawer-title">⚙️ 更多工具</span>
+            <span class="editor-drawer-icon" id="editorDrawerIcon">▲</span>
+        </div>
+        <div class="editor-drawer-body">
+            <div class="drawer-section">
+                <div class="drawer-section-label">🎭 蒙版操作</div>
+                <div class="canvas-toolbar">
+                    <button class="tool-btn" onclick="invertCurrentMask()">◐ 反相</button>
+                    <button class="tool-btn" onclick="featherCurrentMask()">◎ 羽化</button>
+                    <button class="tool-btn" onclick="toggleMaskPreview()">👁 蒙版预览</button>
+                    <button class="tool-btn" id="annoToggleBtn" onclick="toggleAnnotationsVisible()">🏷️ 标签显示</button>
+                </div>
             </div>
-            <div class="mask-tools">
-                <button class="tool-btn" onclick="invertCurrentMask()">◐ 反相</button>
-                <button class="tool-btn" onclick="featherCurrentMask()">◎ 羽化</button>
-                <button class="tool-btn" onclick="toggleMaskPreview()">👁 蒙版预览</button>
-                <button class="tool-btn" id="annoToggleBtn" onclick="toggleAnnotationsVisible()">🏷️ 标签显示</button>
-                <span style="width:1px;height:18px;background:var(--card-border);margin:0 4px;align-self:center;"></span>
-                <button class="tool-btn" onclick="rotateView(-90)" title="左转 90° ( [ )">↺ 左转</button>
-                <button class="tool-btn" onclick="rotateView(90)"  title="右转 90° ( ] )">↻ 右转</button>
-                <button class="tool-btn" onclick="toggleFlipH()" title="水平翻转">⇄ 水平翻转</button>
-                <button class="tool-btn" onclick="toggleFlipV()" title="垂直翻转">⇅ 垂直翻转</button>
-                <span style="width:1px;height:18px;background:var(--card-border);margin:0 4px;align-self:center;"></span>
-                <button class="tool-btn" onclick="zoomBy(1.25)" title="放大 ( = )">🔍+</button>
-                <button class="tool-btn" onclick="zoomBy(0.8)" title="缩小 ( - )">🔍−</button>
-                <button class="tool-btn" onclick="zoomReset()" title="100%">1:1</button>
-                <button class="tool-btn" onclick="zoomFit()" title="适应画布 ( 0 )">适应</button>
-                <button class="tool-btn" onclick="togglePanMode()" id="panBtn" title="平移模式 ( 空格 )">✋ 平移</button>
-                <span class="zoom-label" id="zoomLabel">100%</span>
-                <span style="width:1px;height:18px;background:var(--card-border);margin:0 4px;align-self:center;"></span>
-                <button class="tool-btn" onclick="resetView()" title="重置视角 ( \ )">⟲ 重置视角</button>
-                <span id="viewStatusLabel" style="align-self:center;font-size:11px;color:var(--text-secondary);margin-left:4px;">0°</span>
+
+            <div class="drawer-section">
+                <div class="drawer-section-label">🔄 视图旋转</div>
+                <div class="canvas-toolbar">
+                    <button class="tool-btn" onclick="rotateView(-90)" title="左转 90° ( [ )">↺ 左转</button>
+                    <button class="tool-btn" onclick="rotateView(90)"  title="右转 90° ( ] )">↻ 右转</button>
+                    <button class="tool-btn" onclick="toggleFlipH()">⇄ 水平翻转</button>
+                    <button class="tool-btn" onclick="toggleFlipV()">⇅ 垂直翻转</button>
+                    <span class="view-status-label" id="viewStatusLabel">0°</span>
+                </div>
+            </div>
+
+            <div class="drawer-section">
+                <div class="drawer-section-label">🔍 缩放</div>
+                <div class="canvas-toolbar">
+                    <button class="tool-btn" onclick="zoomBy(1.25)" title="放大 ( = )">🔍+</button>
+                    <button class="tool-btn" onclick="zoomBy(0.8)" title="缩小 ( - )">🔍−</button>
+                    <button class="tool-btn" onclick="zoomReset()">1:1</button>
+                    <button class="tool-btn" onclick="zoomFit()" title="适应画布 ( 0 )">适应</button>
+                    <span class="zoom-label" id="zoomLabel">100%</span>
+                </div>
+            </div>
+
+            <div class="drawer-section">
+                <div class="drawer-section-label">✋ 平移与重置</div>
+                <div class="canvas-toolbar">
+                    <button class="tool-btn" onclick="togglePanMode()" id="panBtn" title="平移模式 ( 空格 )">✋ 平移</button>
+                    <button class="tool-btn" onclick="resetView()" title="重置视角 ( \ )">⟲ 重置视角</button>
+                </div>
+            </div>
+
+            <div class="drawer-section">
+                <div class="drawer-section-label">🖊️ 笔触</div>
+                <div class="canvas-toolbar">
+                    <span id="brushSizeContainer" style="display:flex; align-items:center; gap:8px; width:100%;">
+                        <span style="font-size:12px; color:var(--text-secondary);">大小:</span>
+                        <input type="range" id="brushSize" min="5" max="100" value="20" style="flex:1;">
+                    </span>
+                </div>
             </div>
         </div>
     </div>
@@ -724,7 +865,8 @@ function zoomFit() {
 }
 function togglePanMode() {
     panModeToggle = !panModeToggle;
-    document.getElementById('panBtn').classList.toggle('active', panModeToggle);
+    const btn = document.getElementById('panBtn');
+    if (btn) btn.classList.toggle('active', panModeToggle);
     container.style.cursor = panModeToggle ? 'grab' : 'default';
     showToast(panModeToggle ? '平移模式开启' : '平移模式关闭');
 }
@@ -1186,7 +1328,8 @@ function deleteAnnotation(annoId) {
 
 function toggleAnnotationsVisible() {
     annotationsVisible = !annotationsVisible;
-    document.getElementById('annoToggleBtn').classList.toggle('active', annotationsVisible);
+    const btn = document.getElementById('annoToggleBtn');
+    if (btn) btn.classList.toggle('active', annotationsVisible);
     renderAnnotations();
     showToast(annotationsVisible ? '标签已显示' : '标签已隐藏');
 }
@@ -1899,7 +2042,6 @@ function updateOutput() {
         lines.push('');
     }
 
-    // === 标签段（含反渲染声明） ===
     const allAnnos = [];
     layers.forEach((layer, i) => {
         (layer.annotations || []).forEach((a, j) => {
@@ -2092,7 +2234,6 @@ function exportCanvasImage() {
     showToast("画布合成图已导出！");
 }
 
-/* 导出标注图：只画标签圆点 + 序号，不含文字 */
 function exportAnnotatedImage() {
     if (activeLayerIndex === -1) { showToast("画布上没有内容！"); return; }
     const layer = layers[activeLayerIndex];
@@ -2162,11 +2303,6 @@ function generateBinaryBWChannelMask(src) {
     return bw;
 }
 
-/* ============================================================
- *  批量导出：两个入口
- * ============================================================ */
-
-/* 入口 1：只导出图（Image_N.png + Image_N_Mask.png），逐张下载，不含 JSON */
 function exportImagesOnly() {
     if (layers.length === 0) { showToast("没有可导出的图像或蒙版！"); return; }
 
@@ -2190,7 +2326,6 @@ function exportImagesOnly() {
     showToast(`已导出 ${total} 张原图 + ${withMask} 张黑白蒙版（不含 JSON）`);
 }
 
-/* 入口 2：打包 ZIP（图 + 蒙版 + 标签 JSON + manifest） */
 async function exportZipPackage() {
     if (layers.length === 0) { showToast("没有可导出的图像或蒙版！"); return; }
 
@@ -2296,7 +2431,28 @@ function updateEditorLayerStatus() {
     el.textContent = `L${activeLayerIndex + 1} · Image_${activeLayerIndex + 1} · ${layer.hasMask ? '有蒙版' : '无蒙版'}${annoCount ? ' · 🏷️' + annoCount : ''}${flags.length ? ' · ' + flags.join('+') : ''}`;
 }
 
+/* ============================================================
+ *  底部工具抽屉开关
+ * ============================================================ */
+function toggleEditorDrawer() {
+    const drawer = document.getElementById('editorDrawer');
+    const icon = document.getElementById('editorDrawerIcon');
+    if (!drawer) return;
+    const willCollapse = !drawer.classList.contains('collapsed');
+    drawer.classList.toggle('collapsed', willCollapse);
+    if (icon) icon.textContent = willCollapse ? '▲' : '▼';
+}
+
+function setEditorDrawerCollapsed(collapsed) {
+    const drawer = document.getElementById('editorDrawer');
+    const icon = document.getElementById('editorDrawerIcon');
+    if (!drawer) return;
+    drawer.classList.toggle('collapsed', !!collapsed);
+    if (icon) icon.textContent = collapsed ? '▲' : '▼';
+}
+
 function openCanvasEditor() {
+    setEditorDrawerCollapsed(true);
     currentTool = TOOL_NONE;
     polygonPoints = [];
     lassoPoints = [];
