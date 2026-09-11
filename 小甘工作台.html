@@ -4,8 +4,2382 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>小甘图像控制与提示词一体化工作台</title>
+<style>
+:root {
+    --bg-color: #000000;
+    --card-bg: rgba(28, 28, 30, 0.75);
+    --card-border: rgba(255, 255, 255, 0.12);
+    --accent-color: #0A84FF;
+    --accent-hover: #409CFF;
+    --lock-color: #FF3B30;
+    --transfer-color: #AF52DE;
+    --text-primary: #FFFFFF;
+    --text-secondary: #8E8E93;
+    --tag-bg: rgba(120, 120, 128, 0.18);
+    --blur-val: blur(20px);
+    --role-base: #0A84FF;
+    --role-object: #AF52DE;
+    --role-style: #FF2D55;
+    --role-structure: #FF9F0A;
+    --role-depth: #5AC8FA;
+    --role-lineart: #30D158;
+}
+* { box-sizing: border-box; margin: 0; padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+body { background-color: var(--bg-color); color: var(--text-primary);
+    display: flex; justify-content: center; align-items: flex-start;
+    min-height: 100vh; padding: 16px 12px 240px 12px; }
+.container { width: 100%; max-width: 1600px; display: flex; flex-direction: column; gap: 16px; }
+header { text-align: center; padding: 4px 0; }
+header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; margin-bottom: 4px; }
+header p { color: var(--text-secondary); font-size: 12px; }
+.glass-card { background: var(--card-bg); backdrop-filter: var(--blur-val);
+    -webkit-backdrop-filter: var(--blur-val); border: 1px solid var(--card-border);
+    border-radius: 16px; padding: 16px; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); }
+.section-title { font-size: 15px; font-weight: 600; color: var(--text-primary);
+    margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.section-title-left { display: flex; align-items: center; gap: 8px; }
+.section-title-left::before { content: ''; display: inline-block; width: 4px; height: 14px;
+    background: var(--accent-color); border-radius: 2px; }
+.workspace-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; align-items: start; }
+@media (max-width: 1024px) { .workspace-grid { grid-template-columns: 1fr; } }
+.canvas-block { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.canvas-container { position: relative; width: 100%; aspect-ratio: 4 / 3; max-height: 60vh;
+    background: #121214; border: 1px solid var(--card-border); border-radius: 12px;
+    overflow: hidden; touch-action: none; cursor: default; }
+.canvas-container.panning { cursor: grabbing; }
+.canvas-stage { position: absolute; inset: 0; transform-origin: center center;
+    transition: transform 0.12s linear; will-change: transform; }
+.canvas-stage.no-transition { transition: none; }
+.canvas-stage canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+#baseCanvas { z-index: 1; }
+#maskCanvas { z-index: 2; }
+#tempCanvas { z-index: 3; pointer-events: none; }
+.annotation-layer { position: absolute; inset: 0; pointer-events: none; z-index: 10; overflow: visible; }
+.annotation-item { position: absolute; pointer-events: auto; transform-origin: 0 0;
+    display: flex; align-items: flex-start; gap: 0; user-select: none; }
+.annotation-pin { width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    border: 2px solid rgba(255,255,255,0.85);
+    cursor: grab; flex-shrink: 0; transition: transform 0.12s; }
+.annotation-pin:active { cursor: grabbing; transform: scale(1.15); }
+.annotation-card { margin-left: 6px; background: rgba(20,20,22,0.92);
+    border: 1px solid rgba(255,255,255,0.18); border-radius: 8px;
+    padding: 6px 8px; font-size: 11px; line-height: 1.4;
+    max-width: 220px; box-shadow: 0 4px 16px rgba(0,0,0,0.55);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.annotation-card .anno-src { color: #E5E5EA; }
+.annotation-card .anno-arrow { color: var(--text-secondary); margin: 0 3px; }
+.annotation-card .anno-tgt { color: #30D158; font-weight: 600; }
+.annotation-card .anno-actions { margin-top: 4px; display: flex; gap: 4px; }
+.annotation-card .anno-actions button {
+    background: rgba(120,120,128,0.25); color: #fff; border: 1px solid var(--card-border);
+    border-radius: 5px; font-size: 10px; padding: 2px 6px; cursor: pointer; }
+.annotation-card .anno-actions button.del { color: #FF3B30; border-color: rgba(255,59,48,0.4); }
+.annotation-item.hidden { display: none; }
+.annotation-item.editing .annotation-card { border-color: var(--accent-color); }
+
+.anno-modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 12000;
+    display: none; align-items: center; justify-content: center; padding: 16px; }
+.anno-modal-mask.active { display: flex; }
+.anno-modal { width: min(420px, 100%); background: rgba(28,28,30,0.98);
+    border: 1px solid var(--card-border); border-radius: 14px; padding: 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7); display: flex; flex-direction: column; gap: 12px; }
+.anno-modal h3 { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+.anno-modal .field-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+.anno-modal input, .anno-modal textarea {
+    width: 100%; background: rgba(0,0,0,0.5); border: 1px solid var(--card-border);
+    border-radius: 8px; padding: 8px 10px; color: #fff; font-size: 13px; outline: none; resize: vertical; }
+.anno-color-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.anno-color-dot { width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
+    border: 2px solid transparent; transition: transform 0.12s; }
+.anno-color-dot.active { border-color: #fff; transform: scale(1.15); }
+.anno-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
+.canvas-toolbar { display: flex; gap: 8px; align-items: center; background: rgba(0,0,0,0.3);
+    padding: 8px 10px; border-radius: 10px; border: 1px solid var(--card-border); flex-wrap: wrap; }
+.tool-btn { background: var(--tag-bg); border: 1px solid transparent; color: #FFF;
+    padding: 8px 12px; min-height: 36px; border-radius: 8px; font-size: 13px; cursor: pointer;
+    transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; }
+.tool-btn.active { background: var(--accent-color); }
+.zoom-label { font-size:12px; color:var(--text-secondary); align-self:center; min-width:42px; text-align:center; }
+.image-control-modifiers { display: flex; flex-direction: column; gap: 16px; }
+.control-group-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.tags-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag-btn { background: var(--tag-bg); border: 1px solid transparent; color: #E5E5EA;
+    padding: 8px 12px; min-height: 34px; border-radius: 17px; font-size: 12px; cursor: pointer;
+    transition: all 0.15s ease; user-select: none; display: inline-flex; align-items: center; }
+.tag-btn.active { background: var(--accent-color); color: #FFFFFF; }
+.tag-btn.lock-tag.active { background: var(--lock-color) !important; }
+.tag-btn.transfer-tag.active { background: var(--transfer-color) !important; }
+.ref-gallery { display: flex; gap: 10px; flex-wrap: nowrap; overflow-x: auto;
+    padding-bottom: 6px; max-height: none; }
+.ref-item { position: relative; min-width: 110px; width: 110px; border-radius: 8px;
+    overflow: hidden; border: 2px solid var(--card-border); cursor: pointer; background: #000;
+    display: flex; flex-direction: column; flex-shrink: 0; }
+.ref-item.active { border-color: var(--accent-color); box-shadow: 0 0 8px rgba(10, 132, 255, 0.6); }
+.ref-item img { width: 100%; height: 70px; object-fit: cover; }
+.ref-item select { width: 100%; background: #1C1C1E; color: #FFF; font-size: 10px;
+    border: none; padding: 4px 2px; outline: none; }
+.ref-item .layer-tag { font-size: 10px; text-align: center; padding: 2px 0;
+    color: #30D158; font-weight: bold; background: rgba(0, 0, 0, 0.7); }
+.ref-item .remove-btn { position: absolute; top: 2px; right: 2px; background: rgba(0, 0, 0, 0.7);
+    color: #FF3B30; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 12px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.ref-item .order-badge {
+    position: absolute; top: 2px; left: 2px; z-index: 2;
+    background: rgba(0,0,0,0.78); color: #fff; font-size: 10px; font-weight: 700;
+    padding: 2px 6px; border-radius: 10px; display: flex; align-items: center; gap: 4px;
+    border: 1px solid rgba(255,255,255,0.18); pointer-events: none; }
+.ref-item .order-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: #8E8E93; }
+.ref-item .role-strip { height: 3px; width: 100%; background: #8E8E93; }
+.ref-item .anno-count {
+    position: absolute; bottom: 26px; right: 2px;
+    background: rgba(255,159,10,0.9); color: #000; font-size: 10px; font-weight: 700;
+    padding: 1px 5px; border-radius: 8px; }
+.ref-gallery-hint {
+    font-size: 11px; color: var(--text-secondary); margin: 2px 0 4px 0;
+    display: flex; align-items: center; gap: 6px; }
+.ref-gallery-hint b { color: #fff; }
+.file-btn { background: rgba(120, 120, 128, 0.2); border: 1px solid var(--card-border);
+    color: #FFF; padding: 10px 14px; min-height: 40px; border-radius: 8px; font-size: 13px;
+    cursor: pointer; text-align: center; display: inline-flex; align-items: center; justify-content: center; }
+.file-btn input { display: none; }
+.custom-input, .text-area-input { width: 100%; background: rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--card-border); border-radius: 10px; padding: 10px 12px;
+    color: #FFFFFF; font-size: 13px; outline: none; }
+.floating-output { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
+    width: calc(100% - 24px); max-width: 1600px; z-index: 999;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.floating-output.collapsed { transform: translateX(-50%) translateY(calc(100% - 48px)); }
+.output-box { width: 100%; height: 140px; background: rgba(0, 0, 0, 0.65);
+    border: 1px solid var(--card-border); border-radius: 10px; padding: 10px;
+    color: #E5E5EA; font-size: 12px; font-family: monospace; resize: none;
+    outline: none; line-height: 1.5; }
+.action-bar { display: flex; justify-content: space-between; align-items: center;
+    margin-top: 8px; flex-wrap: wrap; gap: 8px; }
+.btn { background: var(--accent-color); color: #FFFFFF; border: none; padding: 8px 16px;
+    min-height: 38px; border-radius: 10px; font-size: 13px; font-weight: 500;
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.btn-secondary { background: rgba(120, 120, 128, 0.25); }
+.btn-danger { background: rgba(255, 59, 48, 0.25); color: #FF3B30;
+    border: 1px solid rgba(255, 59, 48, 0.4); }
+.toast { position: fixed; bottom: 220px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: rgba(52, 199, 89, 0.95); color: #FFF; padding: 8px 18px; border-radius: 20px;
+    font-size: 13px; opacity: 0; visibility: hidden; transition: all 0.3s ease;
+    pointer-events: none; z-index: 10000; }
+.toast.show { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
+.main-category-title { display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; font-weight: 600; font-size: 14px; padding: 4px 0; }
+.glass-card.collapsed .category-content { display: none; }
+.glass-card.collapsed .main-category-title span:last-child { transform: rotate(180deg); }
+.converter-panel { display: none; flex-direction: column; gap: 12px; margin-top: 10px;
+    padding-top: 12px; border-top: 1px dashed var(--card-border); }
+.converter-panel.active { display: flex; }
+.input-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.input-row input { flex: 1; min-width: 140px; }
+.workflow-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.workflow-bar select{background:#2c2c2e;color:#fff;border:1px solid var(--card-border);border-radius:8px;padding:7px}
+.status-row{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.status-pill{padding:4px 8px;border-radius:99px;background:rgba(120,120,128,.15);font-size:11px}
+.status-pill.ok{color:#34C759}
+.status-pill.warn{color:#FF9F0A}
+.mask-tools{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.mask-tools .tool-btn{min-height:30px;padding:5px 8px}
+.layer-actions{display:flex;gap:4px;margin-top:4px}
+.layer-actions button{flex:1;min-height:25px;background:rgba(120,120,128,.15);color:#fff;border:1px solid var(--card-border);border-radius:6px;font-size:11px}
+
+/* ===== 独立画布编辑页 ===== */
+.canvas-editor-page { position: fixed; inset: 0; z-index: 5000; display: none;
+    flex-direction: column; background: #080809; color: #fff; overflow: hidden; }
+.canvas-editor-page.active { display: flex; }
+body.canvas-editor-open { overflow: hidden; padding-bottom: 0; }
+.editor-topbar { height: 52px; min-height: 52px; display: flex; align-items: center;
+    justify-content: space-between; gap: 10px; padding: 8px 12px;
+    background: rgba(18,18,20,.96); border-bottom: 1px solid var(--card-border);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+.editor-title { display: flex; align-items: center; gap: 8px; min-width: 0;
+    font-size: 14px; font-weight: 600; }
+.editor-title small { color: var(--text-secondary); font-size: 10px; font-weight: 400; }
+.editor-top-actions { display:flex; gap:6px; }
+.editor-top-actions .btn { min-height: 34px; padding: 5px 10px; font-size: 12px; }
+.editor-stage { flex: 1; min-height: 0; display: flex; align-items: center;
+    justify-content: center; padding: 12px; overflow: hidden; }
+.editor-stage .canvas-block { width: min(100%, 1200px); height: 100%; justify-content: center; }
+.editor-stage .canvas-container { width: 100%; height: 100%; aspect-ratio: auto;
+    max-height: none; flex: 1 1 auto; }
+.editor-toolbar-wrap { flex: 0 0 auto; padding: 8px 12px 12px;
+    background: rgba(18,18,20,.97); border-top: 1px solid var(--card-border);
+    box-shadow: 0 -12px 35px rgba(0,0,0,.35); }
+.editor-toolbar-wrap .canvas-toolbar,
+.editor-toolbar-wrap .mask-tools { max-width: 1200px; margin-left: auto; margin-right: auto; }
+.editor-toolbar-wrap .canvas-toolbar { background: transparent; border: 0; padding: 0; }
+.editor-toolbar-wrap .mask-tools { margin-top: 6px; }
+.canvas-entry-card { display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 12px; border: 1px solid var(--card-border);
+    border-radius: 12px; background: rgba(0,0,0,.22); }
+.canvas-entry-info { min-width: 0; }
+.canvas-entry-info b { display:block; font-size:13px; margin-bottom:3px; }
+.canvas-entry-info span { color:var(--text-secondary); font-size:11px; }
+.editor-open-btn { white-space: nowrap; }
+@media (max-width: 600px) {
+    .editor-topbar { height:48px; min-height:48px; padding:6px 8px; }
+    .editor-stage { padding:6px; }
+    .editor-stage .canvas-container { height:100%; min-height:0; border-radius:10px; }
+    .editor-toolbar-wrap { padding:7px 7px calc(7px + env(safe-area-inset-bottom)); }
+    .editor-toolbar-wrap .canvas-toolbar,
+    .editor-toolbar-wrap .mask-tools { overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none; }
+    .editor-toolbar-wrap .canvas-toolbar::-webkit-scrollbar,
+    .editor-toolbar-wrap .mask-tools::-webkit-scrollbar { display:none; }
+    .editor-toolbar-wrap .tool-btn { flex:0 0 auto; min-height:34px; padding:6px 9px; }
+    .canvas-entry-card { padding:10px; }
+    .canvas-entry-info span { display:block; max-width:220px; line-height:1.35; }
+    body { padding: 6px 6px 180px 6px; }
+    .container { gap: 8px; }
+    header { display: none; }
+    .glass-card { padding: 8px; border-radius: 12px; }
+    .section-title { margin-bottom: 6px; font-size: 13px; }
+    .section-title-left::before { width: 3px; height: 12px; }
+    .workflow-bar { gap: 5px; margin-bottom: 5px; }
+    .workflow-bar b { font-size: 12px; }
+    .workflow-bar select { flex: 1; min-width: 0; padding: 6px; }
+    .workflow-bar .btn { min-height: 30px; padding: 5px 8px; }
+    .status-row { margin: 3px 0 5px; }
+    .status-pill { padding: 3px 6px; font-size: 10px; }
+    .workspace-grid { gap: 8px; }
+    .canvas-block { gap: 6px; }
+    .canvas-container { aspect-ratio: auto; height: min(62svh, calc(100svh - 190px));
+        min-height: 260px; max-height: none; }
+    .canvas-toolbar { justify-content: flex-start; padding: 6px; gap: 5px; }
+    .tool-btn { min-height: 32px; padding: 6px 8px; font-size: 12px; }
+    #brushSizeContainer { width: 100%; margin-left: 0 !important; margin-top: 2px; }
+    #brushSize { flex: 1; }
+    .action-bar { flex-direction: column; align-items: stretch; }
+    .action-bar > div { display: flex; width: 100%; gap: 6px; flex-wrap: wrap; }
+    .action-bar > div > button { flex: 1; }
+    .annotation-card { max-width: 160px; font-size: 10px; }
+}
+@media (max-width: 600px) and (orientation: landscape) {
+    .canvas-container { height: min(62svh, 420px); min-height: 180px; }
+}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 </head>
 <body>
-<!-- 原始工作台文件已发布。请以随本提交上传的“小甘工作台.html”为完整版本。 -->
+
+<div class="container">
+    <header>
+        <h1>小甘 图像控制与提示词一体化工作台</h1>
+        <p>万物迁移 · 精准锁定修饰 · 黑白通道蒙版 · 画布标注 · 显式 AI 控制体系</p>
+    </header>
+
+    <div class="glass-card">
+        <div class="section-title">
+            <div class="section-title-left">🖼️ 图像控制与蒙版绘制工作台</div>
+            <button class="btn btn-secondary" style="font-size:12px; padding:4px 10px; min-height:28px;" onclick="openCanvasEditor()">🖌️ 进入编辑页</button>
+        </div>
+
+        <div class="workflow-bar">
+            <b>🎯 工作流</b>
+            <select id="workflowMode" onchange="applyWorkflowMode(this.value)">
+                <option value="custom">自定义控制</option>
+                <option value="transfer">万物迁移</option>
+                <option value="inpaint">局部修改</option>
+                <option value="material">材质替换</option>
+                <option value="style">风格迁移</option>
+                <option value="environment">环境替换</option>
+            </select>
+            <button class="btn btn-secondary" onclick="saveProject()">💾 保存</button>
+            <button class="btn btn-secondary" onclick="loadProject()">📂 加载</button>
+        </div>
+        <div class="status-row" id="workflowStatus"></div>
+
+        <div class="workspace-grid">
+            <div class="canvas-entry-card">
+                <div class="canvas-entry-info">
+                    <b>🖼️ 画布编辑器</b>
+                    <span>画布、蒙版、套索、多边形、橡皮擦、旋转/翻转/缩放/平移、<b style="color:#FF9F0A;">打标签</b> 已独立到全屏编辑页。</span>
+                </div>
+                <button class="btn editor-open-btn" onclick="openCanvasEditor()">🖌️ 打开画布编辑</button>
+            </div>
+
+            <div class="image-control-modifiers">
+                <div class="control-group-title">🔒 图像控制与锁图修饰符</div>
+                <div class="tags-grid">
+                    <button class="tag-btn transfer-tag" data-val="Object Transfer: Migrate Source Element from Ref Mask to Base Mask Area">🔮 万物迁移 (Object & Element Transfer)</button>
+                    <button class="tag-btn lock-tag" data-val="Inpainting: Partial Redraw on Mask Area">🔒 局部重绘 (Inpainting)</button>
+                    <button class="tag-btn lock-tag" data-val="Structure Lock: Maintain Original Layout & Geometry">🔒 锁定结构 (Structure Lock)</button>
+                    <button class="tag-btn lock-tag" data-val="Style Transfer: Transfer Color & Texture Theme">🔒 风格迁移 (Style Transfer)</button>
+                    <button class="tag-btn lock-tag" data-val="Depth Control: Preserve Precise Spatial Perspective">🔒 保持深度透视 (Depth Control)</button>
+                    <button class="tag-btn lock-tag" data-val="Lineart Guidance: Align Architectural Contours">🔒 锁定线稿构图 (Lineart Guidance)</button>
+                    <button class="tag-btn lock-tag" data-val="Material Replacement: Swap Surface Material While Preserving Geometry">🧱 材质替换 (Material Swap)</button>
+                    <button class="tag-btn lock-tag" data-val="Relighting: Adapt Environment Lighting & Ambient Shadows">💡 光照与环境重投影 (Relighting)</button>
+                    <button class="tag-btn lock-tag" data-val="Perspective Matching: Auto Align Object Perspective Points">📐 视角透视匹配 (Perspective Match)</button>
+                    <button class="tag-btn lock-tag" data-val="Seamless Blending: Soft Gradient Feathering on Mask Boundary">🌫️ 自然边缘融合 (Seamless Blending)</button>
+                    <button class="tag-btn lock-tag" data-val="Background Replacement: Replace Environment Outside Main Subject">🌄 背景/环境替换 (Background Swap)</button>
+                </div>
+
+                <div style="margin-top: 10px;">
+                    <div class="control-group-title">📸 多参考图/底图管理（统一标识编号）</div>
+                    <div class="ref-gallery-hint">
+                        <span>顺序 = 提示词中 <b>Image_N</b> 的编号顺序 · 🟠 徽标 = 该图标签数</span>
+                    </div>
+                    <div class="ref-gallery" id="refGallery"></div>
+                    <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+                        <label class="file-btn" style="width: 100%;">
+                            + 上传图像 (自动分配 Image_N)
+                            <input type="file" accept="image/*" multiple onchange="handleImageUpload(event)">
+                        </label>
+                        <button class="btn btn-danger" style="width: 100%; min-height: 36px; font-size: 12px;" onclick="clearAll()">🗑️ 重置整个工作台</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-card">
+        <div class="section-title">
+            <div class="section-title-left">✏️ 修改细节与自定义提示词</div>
+        </div>
+        <input type="text" id="customInput" class="custom-input" placeholder="例如：把参考图中的雕塑迁移到底图蒙版区域，调整透视并融入环境漫射光..." oninput="debouncedUpdateOutput()">
+    </div>
+
+    <div class="glass-card" style="padding: 14px 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap:wrap; gap:8px;">
+            <span style="font-size: 14px; font-weight: 600; color: var(--text-primary);">📚 提示词库管理与生成工具</span>
+            <div style="display: flex; gap: 8px; flex-wrap:wrap;">
+                <button class="btn btn-secondary" style="font-size:12px; padding:6px 12px; min-height:32px;" onclick="toggleConverterPanel()">⚡ 文本转 JSON</button>
+                <label class="file-btn" style="background: rgba(10, 132, 255, 0.2); border-color: var(--accent-color); font-size:12px; padding:6px 12px; min-height:32px;">
+                    📥 导入 JSON
+                    <input type="file" accept=".json" onchange="importJSONPromptLibrary(event)">
+                </label>
+                <button class="tool-btn" style="font-size:12px; padding:6px 12px; min-height:32px;" onclick="exportCurrentJSONLibrary()">📤 导出 JSON</button>
+            </div>
+        </div>
+
+        <div class="converter-panel" id="converterPanel">
+            <div class="input-row">
+                <input type="text" id="convCategoryTitle" class="custom-input" value="三、 新导入词库" placeholder="一级分类名称">
+                <input type="text" id="convSubCategoryName" class="custom-input" value="1. 常用提示词" placeholder="二级子类名称">
+            </div>
+            <textarea id="convRawText" class="text-area-input" style="height: 90px; resize: vertical;" placeholder="粘贴你的提示词文本..."></textarea>
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                <button class="btn btn-secondary" onclick="executeConvertText(false)">追加至当前词库</button>
+                <button class="btn" onclick="executeConvertText(true)">覆盖替换当前词库</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="promptCategories"></div>
+
+    <div class="glass-card floating-output collapsed" id="floatingOutput">
+        <div class="action-bar" style="margin-bottom:6px; margin-top:0;">
+            <span style="font-size:13px; font-weight:600; cursor:pointer;" onclick="toggleOutputPanel()">
+                Workflow Structured Prompt <span id="toggleIcon">▲</span>
+            </span>
+        </div>
+        <textarea id="promptOutput" class="output-box" readonly placeholder="点击标签、绘制蒙版、打标签或上传图层生成结构化 AI 提示词..."></textarea>
+        <div class="action-bar">
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="btn btn-secondary" onclick="updateOutput(); showToast('提示词已即时刷新！');">🔄 刷新指令</button>
+                <button class="btn btn-secondary" style="background: rgba(48, 209, 88, 0.2); color: #30D158; border: 1px solid rgba(48, 209, 88, 0.4);" onclick="exportImagesOnly()">🖼️ 只导出图</button>
+                <button class="btn btn-secondary" style="background: rgba(255, 159, 10, 0.2); color: #FF9F0A; border: 1px solid rgba(255, 159, 10, 0.4);" onclick="exportZipPackage()">📦 打包 ZIP</button>
+            </div>
+            <button class="btn" onclick="exportWorkflowPrompt()">📋 复制标准 AI 提示词</button>
+        </div>
+    </div>
+</div>
+
+<div class="canvas-editor-page" id="canvasEditorPage">
+    <div class="editor-topbar">
+        <div class="editor-title">
+            <button class="btn btn-secondary" onclick="closeCanvasEditor()">← 返回</button>
+            <span>🖼️ 画布编辑</span>
+            <small id="editorLayerStatus">未加载图像</small>
+        </div>
+        <div class="editor-top-actions">
+            <button class="btn btn-secondary" onclick="exportAnnotatedImage()">导出标注图</button>
+            <button class="btn btn-secondary" onclick="exportCanvasImage()">导出预览</button>
+            <button class="btn" onclick="closeCanvasEditor()">完成</button>
+        </div>
+    </div>
+
+    <div class="editor-stage">
+        <div class="canvas-block">
+            <div class="canvas-container" id="canvasContainer">
+                <div class="canvas-stage" id="canvasStage">
+                    <canvas id="baseCanvas"></canvas>
+                    <canvas id="maskCanvas"></canvas>
+                    <canvas id="tempCanvas"></canvas>
+                </div>
+                <div class="annotation-layer" id="annotationLayer"></div>
+            </div>
+
+            <div class="canvas-toolbar">
+                <button class="tool-btn" id="brushBtn" onclick="setTool('brush')">🖌️ 涂刷</button>
+                <button class="tool-btn" id="lassoBtn" onclick="setTool('lasso')">➰ 套索</button>
+                <button class="tool-btn" id="polygonBtn" onclick="setTool('polygon')">📐 多边形</button>
+                <button class="tool-btn" id="finishPolyBtn" style="display:none; background:#30D158;" onclick="finishPolygon()">✅ 完成</button>
+                <button class="tool-btn" id="eraserBtn" onclick="setTool('eraser')">🧹 橡皮擦</button>
+                <button class="tool-btn" id="annoBtn" onclick="setTool('annotate')" style="background:rgba(255,159,10,0.25);">🏷️ 打标签</button>
+                <button class="tool-btn" onclick="undoMask()">↩️ 撤销</button>
+                <button class="tool-btn" onclick="redoMask()">↪️ 重做</button>
+                <button class="tool-btn" onclick="clearCurrentMask()">清空当前蒙版</button>
+                <span id="brushSizeContainer" style="display:flex; align-items:center; gap:4px; margin-left:auto;">
+                    <span style="font-size:12px; color:var(--text-secondary);">笔触:</span>
+                    <input type="range" id="brushSize" min="5" max="100" value="20" style="width: 80px;">
+                </span>
+            </div>
+            <div class="mask-tools">
+                <button class="tool-btn" onclick="invertCurrentMask()">◐ 反相</button>
+                <button class="tool-btn" onclick="featherCurrentMask()">◎ 羽化</button>
+                <button class="tool-btn" onclick="toggleMaskPreview()">👁 蒙版预览</button>
+                <button class="tool-btn" id="annoToggleBtn" onclick="toggleAnnotationsVisible()">🏷️ 标签显示</button>
+                <span style="width:1px;height:18px;background:var(--card-border);margin:0 4px;align-self:center;"></span>
+                <button class="tool-btn" onclick="rotateView(-90)" title="左转 90° ( [ )">↺ 左转</button>
+                <button class="tool-btn" onclick="rotateView(90)"  title="右转 90° ( ] )">↻ 右转</button>
+                <button class="tool-btn" onclick="toggleFlipH()" title="水平翻转">⇄ 水平翻转</button>
+                <button class="tool-btn" onclick="toggleFlipV()" title="垂直翻转">⇅ 垂直翻转</button>
+                <span style="width:1px;height:18px;background:var(--card-border);margin:0 4px;align-self:center;"></span>
+                <button class="tool-btn" onclick="zoomBy(1.25)" title="放大 ( = )">🔍+</button>
+                <button class="tool-btn" onclick="zoomBy(0.8)" title="缩小 ( - )">🔍−</button>
+                <button class="tool-btn" onclick="zoomReset()" title="100%">1:1</button>
+                <button class="tool-btn" onclick="zoomFit()" title="适应画布 ( 0 )">适应</button>
+                <button class="tool-btn" onclick="togglePanMode()" id="panBtn" title="平移模式 ( 空格 )">✋ 平移</button>
+                <span class="zoom-label" id="zoomLabel">100%</span>
+                <span style="width:1px;height:18px;background:var(--card-border);margin:0 4px;align-self:center;"></span>
+                <button class="tool-btn" onclick="resetView()" title="重置视角 ( \ )">⟲ 重置视角</button>
+                <span id="viewStatusLabel" style="align-self:center;font-size:11px;color:var(--text-secondary);margin-left:4px;">0°</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="anno-modal-mask" id="annoModalMask">
+    <div class="anno-modal">
+        <h3 id="annoModalTitle">新建标签</h3>
+        <div>
+            <div class="field-label">这里是什么（现状描述）</div>
+            <input type="text" id="annoSrcInput" placeholder="例如：现有红砖墙">
+        </div>
+        <div>
+            <div class="field-label">要改成什么（目标修改）</div>
+            <textarea id="annoTgtInput" rows="3" placeholder="例如：换成落地玻璃幕墙，反射周围树木与天空"></textarea>
+        </div>
+        <div>
+            <div class="field-label">颜色标记</div>
+            <div class="anno-color-row" id="annoColorRow"></div>
+        </div>
+        <div class="anno-modal-actions">
+            <button class="btn btn-secondary" onclick="closeAnnoModal()">取消</button>
+            <button class="btn" onclick="confirmAnnoModal()">确定</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast">操作成功！</div>
+
+<script>
+/* ============================================================
+ *  全局状态
+ * ============================================================ */
+const TOOL_NONE = 'none';
+let currentTool = TOOL_NONE;
+
+let promptData = [
+    {
+        title: "一、 展板排版与分析图表达",
+        subCategories: [
+            { name: "1. 展板版式", items: [
+                { label: "上主图版式", val: "Top hero image layout, main image on top" },
+                { label: "左主图版式", val: "Left hero image layout, main image on left" },
+                { label: "网格对齐版式", val: "Grid alignment layout, modular grid layout" }
+            ]}
+        ]
+    },
+    {
+        title: "二、 建筑与材质",
+        subCategories: [
+            { name: "1. 造型与材质", items: [
+                { label: "悬臂结构", val: "Cantilever structure" },
+                { label: "玻璃幕墙", val: "Glass curtain wall" },
+                { label: "清水混凝土", val: "Fair-faced concrete" }
+            ]}
+        ]
+    }
+];
+
+let selectedTags = new Set();
+let layers = [];
+let activeLayerIndex = -1;
+let maskHistory = [];
+let redoHistory = [];
+let updateTimer = null;
+let workflowMode = "custom";
+let maskPreview = false;
+let annotationsVisible = true;
+
+let viewRotation = 0;
+let viewFlipH = false;
+let viewFlipV = false;
+let viewScale = 1;
+let viewOffsetX = 0;
+let viewOffsetY = 0;
+
+let isPanning = false;
+let panStart = { x: 0, y: 0 };
+let panStartOffset = { x: 0, y: 0 };
+let spacePressed = false;
+let panModeToggle = false;
+
+let editingAnnoId = null;
+let pendingAnnoPos = null;
+let draggingAnno = null;
+const ANNO_COLORS = ['#FF9F0A', '#FF3B30', '#30D158', '#0A84FF', '#AF52DE', '#5AC8FA'];
+let currentAnnoColor = ANNO_COLORS[0];
+
+const ROLE_COLORS = {
+    "Base Image": "#0A84FF",
+    "Object Source": "#AF52DE",
+    "Style Reference": "#FF2D55",
+    "Structure Reference": "#FF9F0A",
+    "Depth Reference": "#5AC8FA",
+    "Lineart Reference": "#30D158"
+};
+function getRoleColor(role) {
+    for (const key in ROLE_COLORS) if (role.includes(key)) return ROLE_COLORS[key];
+    return "#8E8E93";
+}
+
+const baseCanvas = document.getElementById('baseCanvas');
+const baseCtx = baseCanvas.getContext('2d');
+const maskCanvas = document.getElementById('maskCanvas');
+const maskCtx = maskCanvas.getContext('2d');
+const tempCanvas = document.getElementById('tempCanvas');
+const tempCtx = tempCanvas.getContext('2d');
+const container = document.getElementById('canvasContainer');
+const canvasStage = document.getElementById('canvasStage');
+const annotationLayer = document.getElementById('annotationLayer');
+
+let isDrawing = false;
+let lassoPoints = [];
+let polygonPoints = [];
+let currentMousePos = { x: 0, y: 0 };
+
+const PROMPT_TEMPLATES = {
+    sections: {
+        inputImages: "=== INPUT IMAGES & ROLES (ORDER = Image_N INDEX) ===",
+        annotations: "=== CANVAS ANNOTATIONS (POSITION-BASED INSTRUCTIONS) ===",
+        layerControl: "=== LAYER & MASK CONTROL INSTRUCTIONS ===",
+        selectedTags: "=== SELECTED PROMPT TAGS ===",
+        workflow: "=== WORKFLOW ===",
+        validation: "=== VALIDATION ===",
+        modification: "=== PROMPT MODIFICATION DETAILS ==="
+    },
+    roleInstructions: {
+        base: (img, mask) => [
+            `• Apply [${mask}] as the inpainting mask over [${img}].`,
+            `  - White Area (255) in [${mask}]: Redraw and execute new prompt modifications.`,
+            `  - Black Area (0) in [${mask}]: Preserve original content of [${img}] strictly without changes.`
+        ],
+        baseNoMask: (img) => [`• Treat [${img}] as the global Base Image for modifications.`],
+        objectSource: (img, mask) => [`• Extract targeted object from White Area (255) of [${mask}] on [${img}].`],
+        objectSourceNoMask: (img) => [`• Use [${img}] as object source reference.`],
+        style: (img) => [`• Extract aesthetic style, color palette, and visual mood from [${img}].`],
+        structure: (img) => [`• Maintain structural frame and geometric alignment of [${img}].`],
+        depth: (img) => [`• Enforce spatial perspective using [${img}] as depth guidance.`],
+        lineart: (img) => [`• Follow edge contours and linework outlines defined in [${img}].`]
+    },
+    objectTransfer: (srcImg, srcMask, baseImg, baseMask) => [
+        `• Object Transfer Execution:`,
+        `  - Source Element: Extract object enclosed by White Area (255) of [${srcMask}] from Reference [${srcImg}].`,
+        `  - Target Placement: Seamlessly insert and compose into White Area (255) of [${baseMask}] on Base Image [${baseImg}].`,
+        `  - Environmental Harmonization: Match lighting, ambient shadows, perspective angle, and edge blending of [${baseImg}].`
+    ]
+};
+
+/* ============================================================
+ *  视图变换
+ * ============================================================ */
+function clampScale(s) { return Math.max(0.1, Math.min(8, s)); }
+
+function applyViewTransform(skipTransition) {
+    if (!canvasStage || !container) return;
+
+    if (skipTransition) canvasStage.classList.add('no-transition');
+    else canvasStage.classList.remove('no-transition');
+
+    const rot = ((viewRotation % 360) + 360) % 360;
+    const scaleX = viewFlipH ? -1 : 1;
+    const scaleY = viewFlipV ? -1 : 1;
+
+    const rect = container.getBoundingClientRect();
+    canvasStage.style.width = rect.width + 'px';
+    canvasStage.style.height = rect.height + 'px';
+    canvasStage.style.left = '0px';
+    canvasStage.style.top = '0px';
+
+    canvasStage.style.transform =
+        `translate(${viewOffsetX}px, ${viewOffsetY}px) ` +
+        `scale(${viewScale}) ` +
+        `rotate(${rot}deg) ` +
+        `scale(${scaleX}, ${scaleY})`;
+
+    const lbl = document.getElementById('viewStatusLabel');
+    if (lbl) {
+        const flags = [];
+        if (viewFlipH) flags.push('H');
+        if (viewFlipV) flags.push('V');
+        lbl.textContent = `${rot}°${flags.length ? ' · ' + flags.join('+') : ''}`;
+    }
+    const zl = document.getElementById('zoomLabel');
+    if (zl) zl.textContent = Math.round(viewScale * 100) + '%';
+
+    if (annotationLayer) {
+        annotationLayer.style.transform = canvasStage.style.transform;
+        annotationLayer.style.transformOrigin = 'center center';
+        annotationLayer.style.width = rect.width + 'px';
+        annotationLayer.style.height = rect.height + 'px';
+        annotationLayer.style.left = '0px';
+        annotationLayer.style.top = '0px';
+    }
+
+    if (skipTransition) {
+        requestAnimationFrame(() => canvasStage.classList.remove('no-transition'));
+    }
+
+    renderAnnotations();
+}
+
+function rotateView(delta) {
+    viewRotation = (viewRotation + delta + 360) % 360;
+    applyViewTransform();
+    resizeCanvas();
+    redrawTempCanvas();
+    showToast(`旋转至 ${viewRotation}°`);
+}
+function toggleFlipH() {
+    viewFlipH = !viewFlipH;
+    applyViewTransform();
+    redrawTempCanvas();
+    showToast(viewFlipH ? '水平翻转开启' : '水平翻转关闭');
+}
+function toggleFlipV() {
+    viewFlipV = !viewFlipV;
+    applyViewTransform();
+    redrawTempCanvas();
+    showToast(viewFlipV ? '垂直翻转开启' : '垂直翻转关闭');
+}
+function resetView() {
+    viewRotation = 0;
+    viewFlipH = false;
+    viewFlipV = false;
+    viewScale = 1;
+    viewOffsetX = 0;
+    viewOffsetY = 0;
+    applyViewTransform();
+    resizeCanvas();
+    redrawTempCanvas();
+    showToast('视角已重置');
+}
+
+function zoomBy(factor, centerClientX, centerClientY) {
+    const oldScale = viewScale;
+    const newScale = clampScale(viewScale * factor);
+    if (newScale === oldScale) return;
+
+    const rect = container.getBoundingClientRect();
+    const anchorX = (centerClientX != null) ? (centerClientX - rect.left - rect.width / 2) : 0;
+    const anchorY = (centerClientY != null) ? (centerClientY - rect.top - rect.height / 2) : 0;
+
+    const ratio = newScale / oldScale;
+    viewOffsetX = anchorX - (anchorX - viewOffsetX) * ratio;
+    viewOffsetY = anchorY - (anchorY - viewOffsetY) * ratio;
+    viewScale = newScale;
+
+    applyViewTransform(true);
+    redrawTempCanvas();
+}
+
+function zoomReset() {
+    viewScale = 1;
+    viewOffsetX = 0;
+    viewOffsetY = 0;
+    applyViewTransform();
+    redrawTempCanvas();
+    showToast('缩放 100%');
+}
+function zoomFit() {
+    viewScale = 1;
+    viewOffsetX = 0;
+    viewOffsetY = 0;
+    applyViewTransform();
+    resizeCanvas();
+    redrawTempCanvas();
+    showToast('已适应画布');
+}
+function togglePanMode() {
+    panModeToggle = !panModeToggle;
+    document.getElementById('panBtn').classList.toggle('active', panModeToggle);
+    container.style.cursor = panModeToggle ? 'grab' : 'default';
+    showToast(panModeToggle ? '平移模式开启' : '平移模式关闭');
+}
+function startPan(clientX, clientY) {
+    isPanning = true;
+    panStart = { x: clientX, y: clientY };
+    panStartOffset = { x: viewOffsetX, y: viewOffsetY };
+    container.classList.add('panning');
+}
+function movePan(clientX, clientY) {
+    if (!isPanning) return;
+    viewOffsetX = panStartOffset.x + (clientX - panStart.x);
+    viewOffsetY = panStartOffset.y + (clientY - panStart.y);
+    applyViewTransform(true);
+}
+function endPan() {
+    isPanning = false;
+    container.classList.remove('panning');
+}
+
+/* ============================================================
+ *  Canvas 尺寸与坐标
+ * ============================================================ */
+function resizeCanvas() {
+    applyViewTransform(true);
+
+    const stageW = Math.round(container.clientWidth);
+    const stageH = Math.round(container.clientHeight);
+    if (stageW === 0 || stageH === 0) return;
+
+    [baseCanvas, maskCanvas, tempCanvas].forEach(c => {
+        c.width = stageW;
+        c.height = stageH;
+    });
+
+    if (activeLayerIndex >= 0 && layers[activeLayerIndex]) {
+        renderCurrentActiveLayer();
+    } else {
+        initWorkspace();
+    }
+    renderAnnotations();
+}
+
+function initWorkspace() {
+    baseCtx.fillStyle = '#1C1C1E';
+    baseCtx.fillRect(0, 0, baseCanvas.width, baseCanvas.height);
+    baseCtx.fillStyle = '#8E8E93';
+    baseCtx.font = '14px -apple-system';
+    baseCtx.textAlign = 'center';
+    baseCtx.fillText('未加载图像 (请在上方上传底图)', baseCanvas.width / 2, baseCanvas.height / 2);
+}
+
+function getContainRect(imgW, imgH, cW, cH) {
+    const ir = imgW / imgH, cr = cW / cH;
+    let w, h, x, y;
+    if (ir > cr) { w = cW; h = cW / ir; x = 0; y = (cH - h) / 2; }
+    else { h = cH; w = cH * ir; x = (cW - w) / 2; y = 0; }
+    return { x, y, w, h };
+}
+
+function getCanvasCoords(clientX, clientY) {
+    const rect = container.getBoundingClientRect();
+    let dx = clientX - (rect.left + rect.width / 2);
+    let dy = clientY - (rect.top + rect.height / 2);
+
+    dx -= viewOffsetX;
+    dy -= viewOffsetY;
+    dx /= viewScale;
+    dy /= viewScale;
+
+    const rad = -viewRotation * Math.PI / 180;
+    const cos = Math.cos(rad), sin = Math.sin(rad);
+    let rx = dx * cos - dy * sin;
+    let ry = dx * sin + dy * cos;
+
+    if (viewFlipH) rx = -rx;
+    if (viewFlipV) ry = -ry;
+
+    const localX = rect.width / 2 + rx;
+    const localY = rect.height / 2 + ry;
+
+    return {
+        x: localX * (tempCanvas.width / rect.width),
+        y: localY * (tempCanvas.height / rect.height)
+    };
+}
+
+function screenToRaw(layer, pt) {
+    const rect = getContainRect(layer.rawWidth, layer.rawHeight, maskCanvas.width, maskCanvas.height);
+    return {
+        x: (pt.x - rect.x) / rect.w * layer.rawWidth,
+        y: (pt.y - rect.y) / rect.h * layer.rawHeight
+    };
+}
+
+function renderCurrentActiveLayer() {
+    if (activeLayerIndex < 0 || !layers[activeLayerIndex]) return;
+    const layer = layers[activeLayerIndex];
+
+    baseCtx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
+    maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+
+    const rect = getContainRect(layer.rawWidth, layer.rawHeight, baseCanvas.width, baseCanvas.height);
+    baseCtx.drawImage(layer.imgObj, rect.x, rect.y, rect.w, rect.h);
+    maskCtx.drawImage(layer.maskCanvas, rect.x, rect.y, rect.w, rect.h);
+
+    redrawTempCanvas();
+    updateEditorLayerStatus();
+    renderAnnotations();
+}
+
+function handleImageUpload(e) {
+    const files = Array.from(e.target.files);
+    files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = ev => {
+            const img = new Image();
+            img.onload = () => {
+                const mc = document.createElement('canvas');
+                mc.width = img.naturalWidth;
+                mc.height = img.naturalHeight;
+                const isFirst = layers.length === 0;
+                layers.push({
+                    id: Date.now() + Math.random(),
+                    role: isFirst ? "Base Image (底图修改源)" : "Object Source (迁移物件参考源)",
+                    imgObj: img,
+                    rawWidth: img.naturalWidth,
+                    rawHeight: img.naturalHeight,
+                    maskCanvas: mc,
+                    hasMask: false,
+                    annotations: []
+                });
+                switchLayer(layers.length - 1);
+                renderRefGallery();
+                debouncedUpdateOutput();
+            };
+            img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+}
+
+function switchLayer(index) {
+    if (index < 0 || index >= layers.length) return;
+    activeLayerIndex = index;
+    polygonPoints = [];
+    lassoPoints = [];
+    maskHistory = [];
+    redoHistory = [];
+    renderCurrentActiveLayer();
+    pushMaskState();
+    renderRefGallery();
+}
+
+function recomputeHasMask(layer) {
+    const ctx = layer.maskCanvas.getContext('2d');
+    const data = ctx.getImageData(0, 0, layer.maskCanvas.width, layer.maskCanvas.height).data;
+    for (let i = 3; i < data.length; i += 4) {
+        if (data[i] > 0) { layer.hasMask = true; return; }
+    }
+    layer.hasMask = false;
+}
+
+function pushMaskState(clearRedo = true) {
+    if (activeLayerIndex === -1) return;
+    maskHistory.push(maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height));
+    if (maskHistory.length > 30) maskHistory.shift();
+    if (clearRedo) redoHistory = [];
+}
+function undoMask() {
+    if (maskHistory.length <= 1) return;
+    redoHistory.push(maskHistory.pop());
+    maskCtx.putImageData(maskHistory[maskHistory.length - 1], 0, 0);
+    syncScreenMaskToLayer();
+    redrawTempCanvas();
+    debouncedUpdateOutput();
+}
+function redoMask() {
+    if (!redoHistory.length) return;
+    const st = redoHistory.pop();
+    maskHistory.push(st);
+    maskCtx.putImageData(st, 0, 0);
+    syncScreenMaskToLayer();
+    redrawTempCanvas();
+    debouncedUpdateOutput();
+}
+function syncScreenMaskToLayer() {
+    if (activeLayerIndex < 0) return;
+    const layer = layers[activeLayerIndex];
+    const lctx = layer.maskCanvas.getContext('2d');
+    lctx.clearRect(0, 0, layer.rawWidth, layer.rawHeight);
+    const rect = getContainRect(layer.rawWidth, layer.rawHeight, maskCanvas.width, maskCanvas.height);
+    lctx.drawImage(maskCanvas, rect.x, rect.y, rect.w, rect.h, 0, 0, layer.rawWidth, layer.rawHeight);
+    recomputeHasMask(layer);
+}
+
+/* ============================================================
+ *  打标签
+ * ============================================================ */
+function clientToNormalized(clientX, clientY) {
+    if (activeLayerIndex < 0) return null;
+    const layer = layers[activeLayerIndex];
+    const canvasPos = getCanvasCoords(clientX, clientY);
+    const rawPos = screenToRaw(layer, canvasPos);
+    return {
+        nx: rawPos.x / layer.rawWidth,
+        ny: rawPos.y / layer.rawHeight
+    };
+}
+
+function normalizedToClient(nx, ny) {
+    if (activeLayerIndex < 0) return null;
+    const layer = layers[activeLayerIndex];
+    const containerRect = container.getBoundingClientRect();
+    const containRect = getContainRect(layer.rawWidth, layer.rawHeight, maskCanvas.width, maskCanvas.height);
+
+    const canvasX = containRect.x + nx * containRect.w;
+    const canvasY = containRect.y + ny * containRect.h;
+
+    let dx = canvasX - maskCanvas.width / 2;
+    let dy = canvasY - maskCanvas.height / 2;
+
+    const rad = viewRotation * Math.PI / 180;
+    const cos = Math.cos(rad), sin = Math.sin(rad);
+    let rx = dx * cos - dy * sin;
+    let ry = dx * sin + dy * cos;
+
+    rx *= viewScale;
+    ry *= viewScale;
+
+    if (viewFlipH) rx = -rx;
+    if (viewFlipV) ry = -ry;
+
+    rx += viewOffsetX;
+    ry += viewOffsetY;
+
+    return {
+        x: containerRect.left + containerRect.width / 2 + rx,
+        y: containerRect.top + containerRect.height / 2 + ry
+    };
+}
+
+function renderAnnotations() {
+    if (!annotationLayer) return;
+    annotationLayer.innerHTML = '';
+
+    if (activeLayerIndex < 0) return;
+    const layer = layers[activeLayerIndex];
+    if (!layer || !layer.annotations) return;
+    if (!annotationsVisible) return;
+
+    layer.annotations.forEach((anno, idx) => {
+        const item = document.createElement('div');
+        item.className = 'annotation-item';
+        item.dataset.annoId = anno.id;
+
+        const pin = document.createElement('div');
+        pin.className = 'annotation-pin';
+        pin.style.background = anno.color;
+        pin.textContent = idx + 1;
+
+        const card = document.createElement('div');
+        card.className = 'annotation-card';
+        const srcDiv = document.createElement('div');
+        srcDiv.className = 'anno-src';
+        srcDiv.textContent = anno.src || '(未填写)';
+        const tgtDiv = document.createElement('div');
+        const arrow = document.createElement('span');
+        arrow.className = 'anno-arrow';
+        arrow.textContent = '→';
+        const tgtSpan = document.createElement('span');
+        tgtSpan.className = 'anno-tgt';
+        tgtSpan.textContent = anno.tgt || '(未填写)';
+        tgtDiv.appendChild(arrow);
+        tgtDiv.appendChild(tgtSpan);
+
+        const actions = document.createElement('div');
+        actions.className = 'anno-actions';
+        const editBtn = document.createElement('button');
+        editBtn.textContent = '编辑';
+        editBtn.onclick = e => { e.stopPropagation(); openAnnoModal(anno.id); };
+        const delBtn = document.createElement('button');
+        delBtn.className = 'del';
+        delBtn.textContent = '删除';
+        delBtn.onclick = e => { e.stopPropagation(); deleteAnnotation(anno.id); };
+        actions.appendChild(editBtn);
+        actions.appendChild(delBtn);
+
+        card.appendChild(srcDiv);
+        card.appendChild(tgtDiv);
+        card.appendChild(actions);
+
+        item.appendChild(pin);
+        item.appendChild(card);
+
+        const clientPos = normalizedToClient(anno.nx, anno.ny);
+        if (clientPos) {
+            const layerRect = annotationLayer.getBoundingClientRect();
+            item.style.left = (clientPos.x - layerRect.left - 11) + 'px';
+            item.style.top  = (clientPos.y - layerRect.top  - 11) + 'px';
+        }
+
+        pin.addEventListener('pointerdown', e => {
+            if (currentTool !== 'annotate') return;
+            e.preventDefault();
+            e.stopPropagation();
+            draggingAnno = {
+                id: anno.id,
+                startClientX: e.clientX,
+                startClientY: e.clientY,
+                startNx: anno.nx,
+                startNy: anno.ny,
+                layerIndex: activeLayerIndex
+            };
+            pin.setPointerCapture(e.pointerId);
+        });
+
+        annotationLayer.appendChild(item);
+    });
+}
+
+function onAnnoPointerMove(e) {
+    if (!draggingAnno) return;
+    const layer = layers[draggingAnno.layerIndex];
+    if (!layer) return;
+
+    const dxScreen = e.clientX - draggingAnno.startClientX;
+    const dyScreen = e.clientY - draggingAnno.startClientY;
+
+    const containRect = getContainRect(layer.rawWidth, layer.rawHeight, maskCanvas.width, maskCanvas.height);
+    let dxC = dxScreen / viewScale;
+    let dyC = dyScreen / viewScale;
+    const rad = -viewRotation * Math.PI / 180;
+    const cos = Math.cos(rad), sin = Math.sin(rad);
+    let rx = dxC * cos - dyC * sin;
+    let ry = dxC * sin + dyC * cos;
+    if (viewFlipH) rx = -rx;
+    if (viewFlipV) ry = -ry;
+
+    const nx = draggingAnno.startNx + rx / containRect.w;
+    const ny = draggingAnno.startNy + ry / containRect.h;
+
+    const anno = layer.annotations.find(a => a.id === draggingAnno.id);
+    if (!anno) return;
+    anno.nx = Math.max(0, Math.min(1, nx));
+    anno.ny = Math.max(0, Math.min(1, ny));
+
+    renderAnnotations();
+}
+
+function onAnnoPointerUp() {
+    if (draggingAnno) {
+        draggingAnno = null;
+        debouncedUpdateOutput();
+    }
+}
+document.addEventListener('pointermove', onAnnoPointerMove);
+document.addEventListener('pointerup', onAnnoPointerUp);
+
+function handleAnnotateClick(clientX, clientY) {
+    if (activeLayerIndex < 0) { showToast('请先加载图像'); return; }
+    const pos = clientToNormalized(clientX, clientY);
+    if (!pos) return;
+    if (pos.nx < 0 || pos.nx > 1 || pos.ny < 0 || pos.ny > 1) {
+        showToast('请点击图像范围内');
+        return;
+    }
+    pendingAnnoPos = pos;
+    openAnnoModal(null, pos);
+}
+
+function openAnnoModal(annoId, pos) {
+    editingAnnoId = annoId;
+    const mask = document.getElementById('annoModalMask');
+    const title = document.getElementById('annoModalTitle');
+    const srcInput = document.getElementById('annoSrcInput');
+    const tgtInput = document.getElementById('annoTgtInput');
+
+    if (annoId) {
+        const layer = layers[activeLayerIndex];
+        const anno = layer.annotations.find(a => a.id === annoId);
+        if (!anno) return;
+        title.textContent = '编辑标签';
+        srcInput.value = anno.src || '';
+        tgtInput.value = anno.tgt || '';
+        currentAnnoColor = anno.color;
+    } else {
+        title.textContent = '新建标签';
+        srcInput.value = '';
+        tgtInput.value = '';
+        currentAnnoColor = ANNO_COLORS[0];
+    }
+
+    renderAnnoColorDots();
+    mask.classList.add('active');
+    setTimeout(() => srcInput.focus(), 50);
+}
+
+function renderAnnoColorDots() {
+    const row = document.getElementById('annoColorRow');
+    row.innerHTML = '';
+    ANNO_COLORS.forEach(c => {
+        const dot = document.createElement('div');
+        dot.className = 'anno-color-dot' + (c === currentAnnoColor ? ' active' : '');
+        dot.style.background = c;
+        dot.onclick = () => { currentAnnoColor = c; renderAnnoColorDots(); };
+        row.appendChild(dot);
+    });
+}
+
+function closeAnnoModal() {
+    document.getElementById('annoModalMask').classList.remove('active');
+    editingAnnoId = null;
+    pendingAnnoPos = null;
+}
+
+function confirmAnnoModal() {
+    const src = document.getElementById('annoSrcInput').value.trim();
+    const tgt = document.getElementById('annoTgtInput').value.trim();
+    if (!src && !tgt) { showToast('请至少填写一项内容'); return; }
+
+    const layer = layers[activeLayerIndex];
+    if (!layer) return;
+
+    if (editingAnnoId) {
+        const anno = layer.annotations.find(a => a.id === editingAnnoId);
+        if (anno) {
+            anno.src = src;
+            anno.tgt = tgt;
+            anno.color = currentAnnoColor;
+        }
+    } else if (pendingAnnoPos) {
+        layer.annotations.push({
+            id: Date.now() + Math.random(),
+            nx: pendingAnnoPos.nx,
+            ny: pendingAnnoPos.ny,
+            src, tgt,
+            color: currentAnnoColor
+        });
+        showToast('已添加标签');
+    }
+
+    closeAnnoModal();
+    renderAnnotations();
+    renderRefGallery();
+    debouncedUpdateOutput();
+}
+
+function deleteAnnotation(annoId) {
+    const layer = layers[activeLayerIndex];
+    if (!layer) return;
+    layer.annotations = layer.annotations.filter(a => a.id !== annoId);
+    renderAnnotations();
+    renderRefGallery();
+    debouncedUpdateOutput();
+    showToast('标签已删除');
+}
+
+function toggleAnnotationsVisible() {
+    annotationsVisible = !annotationsVisible;
+    document.getElementById('annoToggleBtn').classList.toggle('active', annotationsVisible);
+    renderAnnotations();
+    showToast(annotationsVisible ? '标签已显示' : '标签已隐藏');
+}
+
+/* ============================================================
+ *  绘制事件
+ * ============================================================ */
+function shouldPan(e) {
+    if (e && e.button === 1) return true;
+    if (spacePressed) return true;
+    if (panModeToggle) return true;
+    return false;
+}
+
+function handleStart(clientX, clientY, e) {
+    if (shouldPan(e)) {
+        startPan(clientX, clientY);
+        return;
+    }
+    if (currentTool === 'annotate') {
+        if (activeLayerIndex === -1) { showToast('请先加载图像'); return; }
+        handleAnnotateClick(clientX, clientY);
+        return;
+    }
+    if (activeLayerIndex === -1) return;
+    if (currentTool === TOOL_NONE) return;
+    isDrawing = true;
+    const pos = getCanvasCoords(clientX, clientY);
+
+    if (currentTool === 'brush' || currentTool === 'eraser') {
+        drawBrush(pos);
+    } else if (currentTool === 'lasso') {
+        lassoPoints = [pos];
+    } else if (currentTool === 'polygon') {
+        polygonPoints.push(pos);
+    }
+    redrawTempCanvas();
+}
+
+function handleMove(clientX, clientY, e) {
+    if (isPanning) { movePan(clientX, clientY); return; }
+    currentMousePos = getCanvasCoords(clientX, clientY);
+    if (isDrawing) {
+        if (currentTool === 'brush' || currentTool === 'eraser') drawBrush(currentMousePos);
+        else if (currentTool === 'lasso') lassoPoints.push(currentMousePos);
+    }
+    redrawTempCanvas();
+}
+
+function handleEnd() {
+    if (isPanning) { endPan(); return; }
+    if (!isDrawing) return;
+    isDrawing = false;
+    if (currentTool === 'lasso') {
+        if (lassoPoints.length > 2) fillPathToMask(lassoPoints);
+        lassoPoints = [];
+        redrawTempCanvas();
+    } else if (currentTool === 'brush' || currentTool === 'eraser') {
+        syncScreenMaskToLayer();
+        pushMaskState();
+        updateEditorLayerStatus();
+    }
+}
+
+container.addEventListener('mousemove', e => handleMove(e.clientX, e.clientY, e));
+container.addEventListener('mousedown', e => { if (e.button === 0 || e.button === 1) handleStart(e.clientX, e.clientY, e); });
+window.addEventListener('mouseup', handleEnd);
+
+container.addEventListener('wheel', e => {
+    if (!document.getElementById('canvasEditorPage').classList.contains('active')) return;
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.15 : 0.87;
+    zoomBy(factor, e.clientX, e.clientY);
+}, { passive: false });
+
+let pinchStartDist = 0;
+let pinchStartScale = 1;
+let pinchStartOffset = { x: 0, y: 0 };
+let pinchStartCenter = { x: 0, y: 0 };
+
+container.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+        e.preventDefault();
+        isPanning = true;
+        const [t1, t2] = e.touches;
+        pinchStartDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        pinchStartScale = viewScale;
+        pinchStartOffset = { x: viewOffsetX, y: viewOffsetY };
+        pinchStartCenter = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+    } else if (e.touches.length === 1) {
+        e.preventDefault();
+        handleStart(e.touches[0].clientX, e.touches[0].clientY, null);
+    }
+}, { passive: false });
+
+container.addEventListener('touchmove', e => {
+    if (e.touches.length === 2 && pinchStartDist > 0) {
+        e.preventDefault();
+        const [t1, t2] = e.touches;
+        const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        const newScale = clampScale(pinchStartScale * (dist / pinchStartDist));
+        const center = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+        viewOffsetX = pinchStartOffset.x + (center.x - pinchStartCenter.x);
+        viewOffsetY = pinchStartOffset.y + (center.y - pinchStartCenter.y);
+        const rect = container.getBoundingClientRect();
+        const anchorX = center.x - rect.left - rect.width / 2;
+        const anchorY = center.y - rect.top - rect.height / 2;
+        const ratio = newScale / viewScale;
+        viewOffsetX = anchorX - (anchorX - viewOffsetX) * ratio;
+        viewOffsetY = anchorY - (anchorY - viewOffsetY) * ratio;
+        viewScale = newScale;
+        applyViewTransform(true);
+        redrawTempCanvas();
+    } else if (e.touches.length === 1) {
+        e.preventDefault();
+        handleMove(e.touches[0].clientX, e.touches[0].clientY, null);
+    }
+}, { passive: false });
+
+container.addEventListener('touchend', e => {
+    if (e.touches.length === 0) { pinchStartDist = 0; handleEnd(); }
+    else if (e.touches.length === 1) { pinchStartDist = 0; }
+}, { passive: false });
+
+container.addEventListener('dblclick', () => {
+    if (currentTool === 'polygon' && polygonPoints.length > 2) finishPolygon();
+});
+
+function drawBrush(pos) {
+    const radius = parseInt(document.getElementById('brushSize').value, 10);
+    const layer = layers[activeLayerIndex];
+    if (!layer) return;
+    const rawPos = screenToRaw(layer, pos);
+    const scale = layer.rawWidth / getContainRect(layer.rawWidth, layer.rawHeight, maskCanvas.width, maskCanvas.height).w;
+    const rawRadius = (radius / 2) * scale;
+
+    const lctx = layer.maskCanvas.getContext('2d');
+    lctx.lineWidth = rawRadius * 2;
+    lctx.lineCap = 'round';
+    lctx.lineJoin = 'round';
+
+    if (currentTool === 'brush') {
+        lctx.globalCompositeOperation = 'source-over';
+        lctx.fillStyle = 'rgba(255, 59, 48, 1)';
+        lctx.beginPath();
+        lctx.arc(rawPos.x, rawPos.y, rawRadius, 0, Math.PI * 2);
+        lctx.fill();
+    } else {
+        lctx.globalCompositeOperation = 'destination-out';
+        lctx.beginPath();
+        lctx.arc(rawPos.x, rawPos.y, rawRadius, 0, Math.PI * 2);
+        lctx.fill();
+    }
+    renderMaskOverlay();
+    layer.hasMask = true;
+    autoToggleInpaintTag(true);
+}
+
+function renderMaskOverlay() {
+    if (activeLayerIndex < 0) return;
+    const layer = layers[activeLayerIndex];
+    maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+    const rect = getContainRect(layer.rawWidth, layer.rawHeight, maskCanvas.width, maskCanvas.height);
+    maskCtx.globalAlpha = 0.6;
+    maskCtx.drawImage(layer.maskCanvas, rect.x, rect.y, rect.w, rect.h);
+    maskCtx.globalAlpha = 1;
+}
+
+function fillPathToMask(points) {
+    if (points.length < 3) return;
+    const layer = layers[activeLayerIndex];
+    if (!layer) return;
+    const lctx = layer.maskCanvas.getContext('2d');
+    lctx.globalCompositeOperation = 'source-over';
+    lctx.fillStyle = 'rgba(255, 59, 48, 1)';
+    lctx.beginPath();
+    const p0 = screenToRaw(layer, points[0]);
+    lctx.moveTo(p0.x, p0.y);
+    for (let i = 1; i < points.length; i++) {
+        const p = screenToRaw(layer, points[i]);
+        lctx.lineTo(p.x, p.y);
+    }
+    lctx.closePath();
+    lctx.fill();
+
+    layer.hasMask = true;
+    autoToggleInpaintTag(true);
+    pushMaskState();
+    renderMaskOverlay();
+    updateEditorLayerStatus();
+}
+
+function finishPolygon() {
+    fillPathToMask(polygonPoints);
+    polygonPoints = [];
+    redrawTempCanvas();
+}
+
+function redrawTempCanvas() {
+    tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+    if (lassoPoints.length > 1) {
+        tempCtx.strokeStyle = '#0A84FF';
+        tempCtx.lineWidth = 2;
+        tempCtx.setLineDash([4, 4]);
+        tempCtx.beginPath();
+        tempCtx.moveTo(lassoPoints[0].x, lassoPoints[0].y);
+        for (let i = 1; i < lassoPoints.length; i++) tempCtx.lineTo(lassoPoints[i].x, lassoPoints[i].y);
+        tempCtx.stroke();
+        tempCtx.setLineDash([]);
+    }
+
+    if (polygonPoints.length > 0) {
+        tempCtx.strokeStyle = '#30D158';
+        tempCtx.lineWidth = 2;
+        tempCtx.beginPath();
+        tempCtx.moveTo(polygonPoints[0].x, polygonPoints[0].y);
+        for (let i = 1; i < polygonPoints.length; i++) tempCtx.lineTo(polygonPoints[i].x, polygonPoints[i].y);
+        tempCtx.lineTo(currentMousePos.x, currentMousePos.y);
+        tempCtx.stroke();
+        polygonPoints.forEach((pt, idx) => {
+            tempCtx.fillStyle = (idx === 0) ? '#FF3B30' : '#FFFFFF';
+            tempCtx.beginPath();
+            tempCtx.arc(pt.x, pt.y, (idx === 0) ? 6 : 4, 0, Math.PI * 2);
+            tempCtx.fill();
+        });
+    }
+
+    if (currentTool === 'brush' || currentTool === 'eraser') {
+        const radius = document.getElementById('brushSize').value / 2 * viewScale;
+        tempCtx.strokeStyle = currentTool === 'brush' ? 'rgba(255, 59, 48, 0.9)' : 'rgba(255, 255, 255, 0.9)';
+        tempCtx.lineWidth = 1.5;
+        tempCtx.beginPath();
+        tempCtx.arc(currentMousePos.x, currentMousePos.y, radius, 0, Math.PI * 2);
+        tempCtx.stroke();
+    }
+}
+
+function clearCurrentMask() {
+    if (activeLayerIndex === -1) return;
+    pushMaskState();
+    const layer = layers[activeLayerIndex];
+    layer.maskCanvas.getContext('2d').clearRect(0, 0, layer.rawWidth, layer.rawHeight);
+    layer.hasMask = false;
+    maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+    removeInpaintTag();
+    pushMaskState();
+    updateEditorLayerStatus();
+    debouncedUpdateOutput();
+    showToast("已清空当前图层蒙版");
+}
+function invertCurrentMask() {
+    if (activeLayerIndex < 0) return;
+    pushMaskState();
+    const layer = layers[activeLayerIndex];
+    const ctx = layer.maskCanvas.getContext('2d');
+    const d = ctx.getImageData(0, 0, layer.rawWidth, layer.rawHeight);
+    for (let i = 3; i < d.data.length; i += 4) d.data[i] = 255 - d.data[i];
+    ctx.putImageData(d, 0, 0);
+    recomputeHasMask(layer);
+    renderMaskOverlay();
+    pushMaskState();
+    updateEditorLayerStatus();
+    debouncedUpdateOutput();
+    showToast('蒙版已反相');
+}
+function featherCurrentMask() {
+    if (activeLayerIndex < 0) return;
+    pushMaskState();
+    const layer = layers[activeLayerIndex];
+    const tmp = document.createElement('canvas');
+    tmp.width = layer.rawWidth; tmp.height = layer.rawHeight;
+    const tc = tmp.getContext('2d');
+    tc.filter = 'blur(4px)';
+    tc.drawImage(layer.maskCanvas, 0, 0);
+    const ctx = layer.maskCanvas.getContext('2d');
+    ctx.clearRect(0, 0, layer.rawWidth, layer.rawHeight);
+    ctx.drawImage(tmp, 0, 0);
+    recomputeHasMask(layer);
+    renderMaskOverlay();
+    pushMaskState();
+    updateEditorLayerStatus();
+    debouncedUpdateOutput();
+    showToast('蒙版已羽化');
+}
+function toggleMaskPreview() {
+    maskPreview = !maskPreview;
+    maskCanvas.style.opacity = maskPreview ? 0.75 : 1;
+    showToast(maskPreview ? '开启蒙版预览' : '关闭蒙版预览');
+}
+function removeInpaintTag() {
+    const b = Array.from(document.querySelectorAll('.tag-btn')).find(x => x.dataset.val?.includes('Inpainting'));
+    if (b) { b.classList.remove('active'); selectedTags.delete(b.dataset.val); }
+}
+function autoToggleInpaintTag(forceState) {
+    const btn = Array.from(document.querySelectorAll('.tag-btn')).find(x => x.dataset.val.includes('Inpainting'));
+    if (btn && forceState) {
+        btn.classList.add('active');
+        selectedTags.add(btn.dataset.val);
+    }
+    debouncedUpdateOutput();
+}
+
+function setTool(tool) {
+    currentTool = tool;
+    document.querySelectorAll('.canvas-toolbar .tool-btn').forEach(b => b.classList.remove('active'));
+    if (tool === 'brush') document.getElementById('brushBtn').classList.add('active');
+    if (tool === 'lasso') document.getElementById('lassoBtn').classList.add('active');
+    if (tool === 'polygon') document.getElementById('polygonBtn').classList.add('active');
+    if (tool === 'eraser') document.getElementById('eraserBtn').classList.add('active');
+    if (tool === 'annotate') document.getElementById('annoBtn').classList.add('active');
+    document.getElementById('finishPolyBtn').style.display = (tool === 'polygon') ? 'inline-flex' : 'none';
+    polygonPoints = [];
+    lassoPoints = [];
+    redrawTempCanvas();
+}
+
+function renderRefGallery() {
+    const gallery = document.getElementById('refGallery');
+    gallery.innerHTML = '';
+    layers.forEach((layer, idx) => {
+        const item = document.createElement('div');
+        item.className = `ref-item ${idx === activeLayerIndex ? 'active' : ''}`;
+        item.onclick = e => {
+            if (e.target.tagName !== 'SELECT' && !e.target.classList.contains('remove-btn')
+                && !e.target.closest('.layer-actions')) {
+                switchLayer(idx);
+            }
+        };
+
+        const orderBadge = document.createElement('div');
+        orderBadge.className = 'order-badge';
+        const dot = document.createElement('span');
+        dot.className = 'dot';
+        dot.style.background = getRoleColor(layer.role);
+        orderBadge.appendChild(dot);
+        const orderText = document.createElement('span');
+        orderText.textContent = `L${idx + 1}`;
+        orderBadge.appendChild(orderText);
+
+        const layerTag = document.createElement('div');
+        layerTag.className = 'layer-tag';
+        layerTag.innerText = `Image_${idx + 1}`;
+
+        const roleStrip = document.createElement('div');
+        roleStrip.className = 'role-strip';
+        roleStrip.style.background = getRoleColor(layer.role);
+
+        const img = document.createElement('img');
+        img.src = layer.imgObj.src;
+
+        const select = document.createElement('select');
+        select.onchange = e => {
+            layer.role = e.target.value;
+            renderRefGallery();
+            debouncedUpdateOutput();
+        };
+        const roles = [
+            "Base Image (底图修改源)",
+            "Object Source (迁移物件参考源)",
+            "Style Reference (风格参考源)",
+            "Structure Reference (结构框架参考)",
+            "Depth Reference (深度透视参考)",
+            "Lineart Reference (线稿轮廓参考)"
+        ];
+        roles.forEach(r => {
+            const o = document.createElement('option');
+            o.value = r; o.innerText = r;
+            if (layer.role === r) o.selected = true;
+            select.appendChild(o);
+        });
+
+        const actions = document.createElement('div');
+        actions.className = 'layer-actions';
+        [['复制', () => duplicateLayer(idx)], ['↑', () => moveLayer(idx, -1)], ['↓', () => moveLayer(idx, 1)]]
+            .forEach(([t, f]) => {
+                const b = document.createElement('button');
+                b.textContent = t;
+                b.onclick = e => { e.stopPropagation(); f(); };
+                actions.appendChild(b);
+            });
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-btn';
+        removeBtn.innerText = '×';
+        removeBtn.onclick = e => { e.stopPropagation(); removeLayer(idx); };
+
+        item.appendChild(orderBadge);
+        item.appendChild(layerTag);
+        item.appendChild(roleStrip);
+        item.appendChild(img);
+
+        const count = (layer.annotations || []).length;
+        if (count > 0) {
+            const annoCount = document.createElement('div');
+            annoCount.className = 'anno-count';
+            annoCount.textContent = `🏷️ ${count}`;
+            annoCount.title = `${count} 个标签`;
+            item.appendChild(annoCount);
+        }
+
+        item.appendChild(select);
+        item.appendChild(actions);
+        item.appendChild(removeBtn);
+        gallery.appendChild(item);
+    });
+}
+
+function removeLayer(index) {
+    layers.splice(index, 1);
+    if (layers.length === 0) {
+        activeLayerIndex = -1;
+        baseCtx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
+        maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+        initWorkspace();
+    } else {
+        switchLayer(Math.max(0, index - 1));
+    }
+    renderRefGallery();
+    renderAnnotations();
+    debouncedUpdateOutput();
+}
+
+function clearAll() {
+    layers = []; activeLayerIndex = -1;
+    selectedTags.clear();
+    polygonPoints = []; lassoPoints = [];
+    maskHistory = []; redoHistory = [];
+    document.querySelectorAll('.tag-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('customInput').value = '';
+    baseCtx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
+    maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+    tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+    initWorkspace();
+    renderRefGallery();
+    renderAnnotations();
+    renderWorkflowStatus();
+    updateOutput();
+    showToast("工作台已完全重置");
+}
+
+function duplicateLayer(i) {
+    const l = layers[i]; if (!l) return;
+    const im = new Image();
+    im.onload = () => {
+        const mc = document.createElement('canvas');
+        mc.width = l.rawWidth; mc.height = l.rawHeight;
+        mc.getContext('2d').drawImage(l.maskCanvas, 0, 0);
+        layers.splice(i + 1, 0, {
+            id: Date.now() + Math.random(),
+            role: l.role, imgObj: im,
+            rawWidth: l.rawWidth, rawHeight: l.rawHeight,
+            maskCanvas: mc, hasMask: l.hasMask,
+            annotations: (l.annotations || []).map(a => ({...a, id: Date.now() + Math.random()}))
+        });
+        activeLayerIndex = i + 1;
+        renderRefGallery();
+        renderCurrentActiveLayer();
+        renderWorkflowStatus();
+        debouncedUpdateOutput();
+    };
+    im.src = l.imgObj.src;
+}
+function moveLayer(i, d) {
+    const n = i + d;
+    if (n < 0 || n >= layers.length) return;
+    [layers[i], layers[n]] = [layers[n], layers[i]];
+    activeLayerIndex = n;
+    renderRefGallery();
+    renderCurrentActiveLayer();
+    renderWorkflowStatus();
+    debouncedUpdateOutput();
+    showToast(`图层已移动至 L${n + 1}`);
+}
+
+function renderPromptCategories() {
+    const container = document.getElementById('promptCategories');
+    container.innerHTML = '';
+    promptData.forEach(cat => {
+        const card = document.createElement('div');
+        card.className = 'glass-card';
+
+        const header = document.createElement('div');
+        header.className = 'main-category-title';
+        header.innerHTML = `<span>${cat.title}</span><span>▲</span>`;
+        header.onclick = () => card.classList.toggle('collapsed');
+
+        const content = document.createElement('div');
+        content.className = 'category-content';
+        content.style.marginTop = '12px';
+
+        cat.subCategories.forEach(subCat => {
+            const subTitle = document.createElement('div');
+            subTitle.className = 'control-group-title';
+            subTitle.style.margin = '8px 0 6px 0';
+            subTitle.innerText = subCat.name;
+
+            const grid = document.createElement('div');
+            grid.className = 'tags-grid';
+
+            subCat.items.forEach(item => {
+                const btn = document.createElement('button');
+                btn.className = `tag-btn ${selectedTags.has(item.val) ? 'active' : ''}`;
+                btn.dataset.val = String(item.val ?? '');
+                btn.dataset.label = String(item.label ?? '');
+                btn.innerText = item.label;
+                btn.onclick = () => {
+                    btn.classList.toggle('active');
+                    if (btn.classList.contains('active')) {
+                        if (item.val != null && String(item.val).trim() !== '')
+                            selectedTags.add(String(item.val));
+                    } else {
+                        selectedTags.delete(String(item.val));
+                    }
+                    debouncedUpdateOutput();
+                };
+                grid.appendChild(btn);
+            });
+            content.appendChild(subTitle);
+            content.appendChild(grid);
+        });
+
+        card.appendChild(header);
+        card.appendChild(content);
+        container.appendChild(card);
+    });
+}
+
+function initLockTags() {
+    document.querySelectorAll('.image-control-modifiers .tag-btn').forEach(btn => {
+        btn.onclick = () => {
+            btn.classList.toggle('active');
+            if (btn.classList.contains('active')) selectedTags.add(btn.dataset.val);
+            else selectedTags.delete(btn.dataset.val);
+            debouncedUpdateOutput();
+        };
+    });
+}
+
+function applyWorkflowMode(m) {
+    workflowMode = m;
+    const prefixMap = {
+        transfer: 'Object Transfer:',
+        inpaint: 'Inpainting:',
+        material: 'Inpainting:',
+        style: 'Style Transfer:',
+        environment: 'Background Replacement:'
+    };
+    const p = prefixMap[m];
+    document.querySelectorAll('.image-control-modifiers .tag-btn').forEach(b => {
+        b.classList.remove('active');
+        selectedTags.delete(b.dataset.val);
+    });
+    if (p) {
+        const b = Array.from(document.querySelectorAll('.image-control-modifiers .tag-btn'))
+            .find(x => x.dataset.val.startsWith(p));
+        if (b) { b.classList.add('active'); selectedTags.add(b.dataset.val); }
+    }
+    renderWorkflowStatus();
+    debouncedUpdateOutput();
+}
+
+function renderWorkflowStatus() {
+    const b = document.getElementById('workflowStatus');
+    if (!b) return;
+    const n = layers.length;
+    const m = layers.filter(x => x.hasMask).length;
+    const base = layers.filter(x => x.role.includes('Base Image')).length;
+    const src = layers.filter(x => x.role.includes('Object Source')).length;
+    const annoTotal = layers.reduce((s, l) => s + (l.annotations || []).length, 0);
+    b.innerHTML = `
+        <span class="status-pill ${n ? 'ok' : 'warn'}">图像 ${n}</span>
+        <span class="status-pill ${base === 1 ? 'ok' : 'warn'}">底图 ${base}</span>
+        <span class="status-pill ${m ? 'ok' : 'warn'}">蒙版 ${m}</span>
+        <span class="status-pill ${annoTotal ? 'ok' : ''}">🏷️ 标签 ${annoTotal}</span>
+        ${workflowMode === 'transfer' ? `<span class="status-pill ${src ? 'ok' : 'warn'}">迁移源 ${src}</span>` : ''}
+    `;
+}
+
+function projectData() {
+    return {
+        v: 7,
+        workflowMode,
+        viewRotation, viewFlipH, viewFlipV,
+        viewScale, viewOffsetX, viewOffsetY,
+        selectedTags: [...selectedTags],
+        custom: document.getElementById('customInput').value,
+        layers: layers.map(l => ({
+            role: l.role, src: l.imgObj.src,
+            w: l.rawWidth, h: l.rawHeight,
+            mask: l.maskCanvas.toDataURL(),
+            annotations: (l.annotations || []).map(a => ({
+                nx: a.nx, ny: a.ny, src: a.src, tgt: a.tgt, color: a.color
+            }))
+        }))
+    };
+}
+function saveProject() {
+    try {
+        localStorage.setItem('xiaogan_v03', JSON.stringify(projectData()));
+        showToast('项目已保存（含标签）');
+    } catch (e) { showToast('保存失败：可能超出存储配额'); }
+}
+function loadProject() {
+    const raw = localStorage.getItem('xiaogan_v03');
+    if (!raw) { showToast('暂无保存项目'); return; }
+    try {
+        const d = JSON.parse(raw);
+        layers = []; activeLayerIndex = -1;
+        selectedTags = new Set(d.selectedTags || []);
+        workflowMode = d.workflowMode || 'custom';
+        viewRotation = d.viewRotation || 0;
+        viewFlipH = !!d.viewFlipH;
+        viewFlipV = !!d.viewFlipV;
+        viewScale = d.viewScale || 1;
+        viewOffsetX = d.viewOffsetX || 0;
+        viewOffsetY = d.viewOffsetY || 0;
+        document.getElementById('customInput').value = d.custom || '';
+        applyViewTransform();
+
+        let left = d.layers.length;
+        if (!left) { renderRefGallery(); renderWorkflowStatus(); return; }
+
+        let done = false;
+        const finishOnce = () => {
+            if (done || left > 0) return;
+            done = true;
+            if (layers.length) switchLayer(0);
+            renderRefGallery();
+            initLockTags();
+            renderWorkflowStatus();
+            resizeCanvas();
+            debouncedUpdateOutput();
+            showToast('项目加载完成');
+        };
+
+        setTimeout(() => {
+            if (left > 0) {
+                left = 0; finishOnce();
+                showToast('部分图像加载超时，已加载完成部分');
+            }
+        }, 8000);
+
+        d.layers.forEach(x => {
+            const im = new Image();
+            const mm = new Image();
+            let pending = 2;
+            const tryFinish = () => {
+                pending--;
+                if (pending > 0) return;
+                const mc = document.createElement('canvas');
+                mc.width = x.w; mc.height = x.h;
+                mc.getContext('2d').drawImage(mm, 0, 0);
+                const layer = {
+                    id: Date.now() + Math.random(),
+                    role: x.role, imgObj: im,
+                    rawWidth: x.w, rawHeight: x.h,
+                    maskCanvas: mc, hasMask: false,
+                    annotations: (x.annotations || []).map(a => ({
+                        id: Date.now() + Math.random(),
+                        nx: a.nx, ny: a.ny,
+                        src: a.src || '', tgt: a.tgt || '',
+                        color: a.color || ANNO_COLORS[0]
+                    }))
+                };
+                recomputeHasMask(layer);
+                layers.push(layer);
+                left--;
+                finishOnce();
+            };
+            im.onload = tryFinish; im.onerror = tryFinish;
+            mm.onload = tryFinish; mm.onerror = tryFinish;
+            im.src = x.src;
+            mm.src = x.mask;
+        });
+    } catch (e) { showToast('项目数据损坏'); }
+}
+
+function debouncedUpdateOutput() {
+    clearTimeout(updateTimer);
+    updateTimer = setTimeout(updateOutput, 150);
+}
+
+function findLabelByVal(val) {
+    for (const cat of promptData) {
+        for (const sub of (cat.subCategories || [])) {
+            const item = (sub.items || []).find(x => String(x.val) === String(val));
+            if (item) return item.label || '';
+        }
+    }
+    return '';
+}
+
+function updateOutput() {
+    const lines = [];
+    const T = PROMPT_TEMPLATES;
+
+    if (layers.length > 0) {
+        lines.push(T.sections.inputImages);
+        lines.push(`NOTE: Layer order determines Image_N index. Higher index = later layer in composition stack.`);
+        layers.forEach((layer, i) => {
+            const maskName = `Image_${i + 1}_Mask.png`;
+            const roleColor = getRoleColor(layer.role);
+            const annoCount = (layer.annotations || []).length;
+            lines.push(`• [Image_${i + 1}] (Layer L${i + 1}, color ${roleColor}): ${layer.role}${annoCount ? ` · 🏷️ ${annoCount} annotations` : ''}`);
+            if (layer.hasMask) {
+                lines.push(`  └─ Mask Attachment: [${maskName}] (Black & White Inpainting Channel)`);
+            }
+        });
+        lines.push('');
+    }
+
+    // === 标签段（含反渲染声明） ===
+    const allAnnos = [];
+    layers.forEach((layer, i) => {
+        (layer.annotations || []).forEach((a, j) => {
+            allAnnos.push({ layerIdx: i, idx: j, a });
+        });
+    });
+    if (allAnnos.length > 0) {
+        lines.push(T.sections.annotations);
+        lines.push(`CRITICAL: The annotations below are INSTRUCTIONS ONLY. They are NOT visual elements to be rendered.`);
+        lines.push(`Do NOT draw, paint, or reproduce any annotation markers, circles, numbers, labels, or text onto the final output image.`);
+        lines.push(`Treat each annotation purely as a localized editing command applied to the specified position.`);
+        lines.push(`Position is normalized (0-100%) from top-left of the original image.`);
+        lines.push(`"Current content" describes what exists at that position in the source image; "Required change" describes the desired result.`);
+        lines.push(`The final output must contain ONLY the edited scene — all annotation markers must be completely absent.`);
+        lines.push('');
+        allAnnos.forEach(({ layerIdx, idx, a }) => {
+            const img = `Image_${layerIdx + 1}.png`;
+            const px = Math.round(a.nx * 100);
+            const py = Math.round(a.ny * 100);
+            lines.push(`• [A${idx + 1} · on ${img} · position (${px}%, ${py}%)]:`);
+            lines.push(`  - Current content at this point: "${a.src || '(unspecified)'}"`);
+            lines.push(`  - Required change: replace it with "${a.tgt || '(unspecified)'}"`);
+        });
+        lines.push('');
+    }
+
+    if (layers.length > 0) {
+        lines.push(T.sections.layerControl);
+        const baseIdx = layers.findIndex(l => l.role.includes("Base Image"));
+        const objectSources = layers.map((l, idx) => ({ l, idx }))
+            .filter(x => x.l.role.includes("Object Source"));
+        const isTransfer = [...selectedTags].some(t => t.includes("Object Transfer"));
+
+        if (isTransfer && baseIdx !== -1 && objectSources.length > 0) {
+            const baseImg = `Image_${baseIdx + 1}.png`;
+            const baseMask = `Image_${baseIdx + 1}_Mask.png`;
+            objectSources.forEach(({ l, idx }) => {
+                const srcImg = `Image_${idx + 1}.png`;
+                const srcMask = `Image_${idx + 1}_Mask.png`;
+                T.objectTransfer(srcImg, srcMask, baseImg, baseMask).forEach(x => lines.push(x));
+            });
+        } else {
+            layers.forEach((layer, i) => {
+                const img = `Image_${i + 1}.png`;
+                const mask = `Image_${i + 1}_Mask.png`;
+                const r = layer.role;
+                const inst = T.roleInstructions;
+                let out = [];
+                if (r.includes("Base Image")) {
+                    out = layer.hasMask ? inst.base(img, mask) : inst.baseNoMask(img);
+                } else if (r.includes("Object Source")) {
+                    out = layer.hasMask ? inst.objectSource(img, mask) : inst.objectSourceNoMask(img);
+                } else if (r.includes("Style Reference")) out = inst.style(img);
+                else if (r.includes("Structure")) out = inst.structure(img);
+                else if (r.includes("Depth")) out = inst.depth(img);
+                else if (r.includes("Lineart")) out = inst.lineart(img);
+                out.forEach(x => lines.push(x));
+            });
+        }
+        lines.push('');
+    }
+
+    if (selectedTags.size > 0) {
+        lines.push(T.sections.selectedTags);
+        selectedTags.forEach(val => {
+            const label = findLabelByVal(val);
+            lines.push(label ? `• ${label}: ${val}` : `• ${val}`);
+        });
+        lines.push('');
+    }
+
+    lines.push(T.sections.workflow);
+    lines.push(`• Workflow: ${workflowMode}`);
+    const rotInfo = [];
+    if (viewRotation) rotInfo.push(`${viewRotation}°`);
+    if (viewFlipH) rotInfo.push('H-flip');
+    if (viewFlipV) rotInfo.push('V-flip');
+    if (Math.abs(viewScale - 1) > 0.001) rotInfo.push(`zoom ${Math.round(viewScale * 100)}%`);
+    if (rotInfo.length) lines.push(`• View Transform (visual only, exported data remains original orientation): ${rotInfo.join(' + ')}`);
+
+    const warnings = [];
+    if (workflowMode === 'transfer' && !layers.some(l => l.role.includes('Base Image'))) warnings.push('万物迁移缺少 Base Image');
+    if (workflowMode === 'transfer' && !layers.some(l => l.role.includes('Object Source'))) warnings.push('万物迁移缺少 Object Source');
+    if (warnings.length) {
+        lines.push(T.sections.validation);
+        warnings.forEach(x => lines.push('⚠ ' + x));
+    }
+    lines.push('');
+
+    const customText = document.getElementById('customInput').value.trim();
+    if (customText) {
+        lines.push(T.sections.modification);
+        lines.push(customText);
+    }
+
+    document.getElementById('promptOutput').value = lines.join("\n");
+    renderWorkflowStatus();
+
+    const panel = document.getElementById('floatingOutput');
+    if (lines.length > 0) {
+        panel.classList.remove('collapsed');
+        document.getElementById('toggleIcon').innerText = '▼';
+    }
+}
+
+function toggleOutputPanel() {
+    const panel = document.getElementById('floatingOutput');
+    panel.classList.toggle('collapsed');
+    document.getElementById('toggleIcon').innerText = panel.classList.contains('collapsed') ? '▲' : '▼';
+}
+function toggleConverterPanel() {
+    document.getElementById('converterPanel').classList.toggle('active');
+}
+function executeConvertText(isReplace) {
+    const title = document.getElementById('convCategoryTitle').value.trim() || "导入分类";
+    const subName = document.getElementById('convSubCategoryName').value.trim() || "默认子类";
+    const raw = document.getElementById('convRawText').value.trim();
+    if (!raw) { showToast("请先粘贴需要转换的文本！"); return; }
+
+    const items = [];
+    raw.split('\n').forEach(line => {
+        const c = line.trim();
+        if (!c) return;
+        const parts = c.split(/[:：,，\t]/);
+        if (parts.length >= 2) items.push({ label: parts[0].trim(), val: parts.slice(1).join(', ').trim() });
+        else items.push({ label: c, val: c });
+    });
+
+    const newCat = { title, subCategories: [{ name: subName, items }] };
+    if (isReplace) promptData = [newCat];
+    else promptData.push(newCat);
+    renderPromptCategories();
+    showToast(isReplace ? "已覆盖替换提示词库！" : "新词库已追加成功！");
+}
+function exportCurrentJSONLibrary() {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(promptData, null, 2));
+    const a = document.createElement('a');
+    a.setAttribute("href", dataStr);
+    a.setAttribute("download", `prompt_library_${Date.now()}.json`);
+    document.body.appendChild(a); a.click(); a.remove();
+    showToast("提示词库 JSON 已成功导出！");
+}
+function importJSONPromptLibrary(e) {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+        try {
+            const parsed = JSON.parse(ev.target.result);
+            if (Array.isArray(parsed)) {
+                promptData = parsed;
+                renderPromptCategories();
+                showToast("JSON 词库导入成功！");
+            } else showToast("导入失败：格式必须为 JSON 数组");
+        } catch { showToast("JSON 解析失败，请检查文件"); }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+}
+function exportWorkflowPrompt() {
+    const text = document.getElementById('promptOutput').value;
+    if (!text) { showToast("提示词内容为空"); return; }
+    navigator.clipboard.writeText(text)
+        .then(() => showToast("标准提示词与指令已复制！"))
+        .catch(() => showToast("复制失败，请手动选择复制"));
+}
+
+function exportCanvasImage() {
+    if (activeLayerIndex === -1) { showToast("画布上没有内容！"); return; }
+    const src = document.createElement('canvas');
+    src.width = baseCanvas.width; src.height = baseCanvas.height;
+    const sctx = src.getContext('2d');
+    sctx.drawImage(baseCanvas, 0, 0);
+    sctx.drawImage(maskCanvas, 0, 0);
+
+    const rot = ((viewRotation % 360) + 360) % 360;
+    const isSide = (rot === 90 || rot === 270);
+    const out = document.createElement('canvas');
+    out.width  = isSide ? src.height : src.width;
+    out.height = isSide ? src.width  : src.height;
+    const octx = out.getContext('2d');
+    octx.translate(out.width / 2, out.height / 2);
+    octx.rotate(rot * Math.PI / 180);
+    octx.scale(viewFlipH ? -1 : 1, viewFlipV ? -1 : 1);
+    octx.drawImage(src, -src.width / 2, -src.height / 2);
+
+    const a = document.createElement('a');
+    a.download = `Canvas_Composite_Preview.png`;
+    a.href = out.toDataURL('image/png');
+    a.click();
+    showToast("画布合成图已导出！");
+}
+
+/* 导出标注图：只画标签圆点 + 序号，不含文字 */
+function exportAnnotatedImage() {
+    if (activeLayerIndex === -1) { showToast("画布上没有内容！"); return; }
+    const layer = layers[activeLayerIndex];
+
+    const src = document.createElement('canvas');
+    src.width = baseCanvas.width; src.height = baseCanvas.height;
+    const sctx = src.getContext('2d');
+    sctx.drawImage(baseCanvas, 0, 0);
+    sctx.drawImage(maskCanvas, 0, 0);
+
+    const containRect = getContainRect(layer.rawWidth, layer.rawHeight, maskCanvas.width, maskCanvas.height);
+    const R = 12;
+
+    (layer.annotations || []).forEach((anno, idx) => {
+        const cx = containRect.x + anno.nx * containRect.w;
+        const cy = containRect.y + anno.ny * containRect.h;
+
+        sctx.fillStyle = anno.color;
+        sctx.beginPath();
+        sctx.arc(cx, cy, R, 0, Math.PI * 2);
+        sctx.fill();
+
+        sctx.strokeStyle = '#ffffff';
+        sctx.lineWidth = 2;
+        sctx.stroke();
+
+        sctx.fillStyle = '#000000';
+        sctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif';
+        sctx.textAlign = 'center';
+        sctx.textBaseline = 'middle';
+        sctx.fillText(String(idx + 1), cx, cy);
+    });
+
+    const rot = ((viewRotation % 360) + 360) % 360;
+    const isSide = (rot === 90 || rot === 270);
+    const out = document.createElement('canvas');
+    out.width  = isSide ? src.height : src.width;
+    out.height = isSide ? src.width  : src.height;
+    const octx = out.getContext('2d');
+    octx.translate(out.width / 2, out.height / 2);
+    octx.rotate(rot * Math.PI / 180);
+    octx.scale(viewFlipH ? -1 : 1, viewFlipV ? -1 : 1);
+    octx.drawImage(src, -src.width / 2, -src.height / 2);
+
+    const a = document.createElement('a');
+    a.download = `Annotated_Image_${activeLayerIndex + 1}.png`;
+    a.href = out.toDataURL('image/png');
+    a.click();
+    showToast("标注图已导出（仅标签点）！");
+}
+
+function generateBinaryBWChannelMask(src) {
+    const bw = document.createElement('canvas');
+    bw.width = src.width; bw.height = src.height;
+    const ctx = bw.getContext('2d');
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, bw.width, bw.height);
+    const sd = src.getContext('2d').getImageData(0, 0, src.width, src.height).data;
+    const bd = ctx.getImageData(0, 0, bw.width, bw.height);
+    const out = bd.data;
+    for (let i = 0; i < sd.length; i += 4) {
+        if (sd[i + 3] > 10) {
+            out[i] = 255; out[i + 1] = 255; out[i + 2] = 255; out[i + 3] = 255;
+        }
+    }
+    ctx.putImageData(bd, 0, 0);
+    return bw;
+}
+
+/* ============================================================
+ *  批量导出：两个入口
+ * ============================================================ */
+
+/* 入口 1：只导出图（Image_N.png + Image_N_Mask.png），逐张下载，不含 JSON */
+function exportImagesOnly() {
+    if (layers.length === 0) { showToast("没有可导出的图像或蒙版！"); return; }
+
+    layers.forEach((layer, idx) => {
+        const num = idx + 1;
+        const a1 = document.createElement('a');
+        a1.download = `Image_${num}.png`;
+        a1.href = layer.imgObj.src;
+        a1.click();
+        if (layer.hasMask) {
+            const bw = generateBinaryBWChannelMask(layer.maskCanvas);
+            const a2 = document.createElement('a');
+            a2.download = `Image_${num}_Mask.png`;
+            a2.href = bw.toDataURL('image/png');
+            a2.click();
+        }
+    });
+
+    const total = layers.length;
+    const withMask = layers.filter(l => l.hasMask).length;
+    showToast(`已导出 ${total} 张原图 + ${withMask} 张黑白蒙版（不含 JSON）`);
+}
+
+/* 入口 2：打包 ZIP（图 + 蒙版 + 标签 JSON + manifest） */
+async function exportZipPackage() {
+    if (layers.length === 0) { showToast("没有可导出的图像或蒙版！"); return; }
+
+    if (typeof JSZip === 'undefined') {
+        showToast("ZIP 库未加载，已回退为逐张下载");
+        exportImagesOnly();
+        return;
+    }
+
+    const zip = new JSZip();
+    let fileCount = 0;
+
+    for (let idx = 0; idx < layers.length; idx++) {
+        const layer = layers[idx];
+        const num = idx + 1;
+
+        const base64 = layer.imgObj.src.split(',')[1];
+        if (base64) {
+            zip.file(`Image_${num}.png`, base64, { base64: true });
+            fileCount++;
+        }
+
+        if (layer.hasMask) {
+            const bw = generateBinaryBWChannelMask(layer.maskCanvas);
+            const maskData = bw.toDataURL('image/png').split(',')[1];
+            zip.file(`Image_${num}_Mask.png`, maskData, { base64: true });
+            fileCount++;
+        }
+
+        if ((layer.annotations || []).length > 0) {
+            const annos = layer.annotations.map((a, j) => ({
+                index: j + 1,
+                nx: a.nx,
+                ny: a.ny,
+                from: a.src,
+                to: a.tgt,
+                color: a.color,
+                positionPercent: {
+                    x: Math.round(a.nx * 100),
+                    y: Math.round(a.ny * 100)
+                }
+            }));
+            zip.file(
+                `Image_${num}_Annotations.json`,
+                JSON.stringify({
+                    image: `Image_${num}.png`,
+                    role: layer.role,
+                    width: layer.rawWidth,
+                    height: layer.rawHeight,
+                    annotations: annos
+                }, null, 2)
+            );
+            fileCount++;
+        }
+    }
+
+    const manifest = {
+        exportedAt: new Date().toISOString(),
+        workflowMode,
+        totalLayers: layers.length,
+        layers: layers.map((l, i) => ({
+            index: i + 1,
+            image: `Image_${i + 1}.png`,
+            mask: l.hasMask ? `Image_${i + 1}_Mask.png` : null,
+            annotations: (l.annotations || []).length > 0
+                ? `Image_${i + 1}_Annotations.json`
+                : null,
+            role: l.role,
+            width: l.rawWidth,
+            height: l.rawHeight
+        }))
+    };
+    zip.file('manifest.json', JSON.stringify(manifest, null, 2));
+    fileCount++;
+
+    try {
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `xiaogan_export_${Date.now()}.zip`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+        showToast(`ZIP 打包完成（${fileCount} 个文件）`);
+    } catch (err) {
+        showToast("ZIP 打包失败：" + err.message);
+    }
+}
+
+function updateEditorLayerStatus() {
+    const el = document.getElementById('editorLayerStatus');
+    if (!el) return;
+    if (activeLayerIndex < 0 || !layers[activeLayerIndex]) {
+        el.textContent = '未加载图像';
+        return;
+    }
+    const layer = layers[activeLayerIndex];
+    const flags = [];
+    if (viewRotation) flags.push(`${viewRotation}°`);
+    if (viewFlipH) flags.push('H');
+    if (viewFlipV) flags.push('V');
+    if (Math.abs(viewScale - 1) > 0.001) flags.push(`${Math.round(viewScale * 100)}%`);
+    const annoCount = (layer.annotations || []).length;
+    el.textContent = `L${activeLayerIndex + 1} · Image_${activeLayerIndex + 1} · ${layer.hasMask ? '有蒙版' : '无蒙版'}${annoCount ? ' · 🏷️' + annoCount : ''}${flags.length ? ' · ' + flags.join('+') : ''}`;
+}
+
+function openCanvasEditor() {
+    currentTool = TOOL_NONE;
+    polygonPoints = [];
+    lassoPoints = [];
+    document.querySelectorAll('.canvas-toolbar .tool-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('finishPolyBtn').style.display = 'none';
+
+    const page = document.getElementById('canvasEditorPage');
+    if (!page) return;
+    page.classList.add('active');
+    document.body.classList.add('canvas-editor-open');
+    requestAnimationFrame(() => {
+        resizeCanvas();
+        renderMaskOverlay();
+        updateEditorLayerStatus();
+        redrawTempCanvas();
+        renderAnnotations();
+    });
+}
+
+function closeCanvasEditor() {
+    const page = document.getElementById('canvasEditorPage');
+    if (page) page.classList.remove('active');
+    document.body.classList.remove('canvas-editor-open');
+    renderRefGallery();
+    renderWorkflowStatus();
+    debouncedUpdateOutput();
+}
+
+document.addEventListener('keydown', e => {
+    const editorOpen = document.getElementById('canvasEditorPage')?.classList.contains('active');
+
+    if (e.key === 'Escape' && editorOpen) {
+        if (document.getElementById('annoModalMask').classList.contains('active')) {
+            closeAnnoModal();
+            return;
+        }
+        closeCanvasEditor();
+        return;
+    }
+    if (!editorOpen) return;
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+
+    if (e.key === '[') { e.preventDefault(); rotateView(-90); }
+    else if (e.key === ']') { e.preventDefault(); rotateView(90); }
+    else if (e.key === '\\') { e.preventDefault(); resetView(); }
+    else if (e.key === '=' || e.key === '+') { e.preventDefault(); zoomBy(1.25); }
+    else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomBy(0.8); }
+    else if (e.key === '0') { e.preventDefault(); zoomFit(); }
+    else if (e.key === 't' || e.key === 'T') { e.preventDefault(); setTool('annotate'); }
+    else if (e.key === ' ') {
+        spacePressed = true;
+        container.style.cursor = 'grab';
+        e.preventDefault();
+    }
+});
+document.addEventListener('keyup', e => {
+    if (e.key === ' ') {
+        spacePressed = false;
+        if (!panModeToggle) container.style.cursor = 'default';
+    }
+});
+
+window.addEventListener('resize', () => {
+    applyViewTransform();
+    resizeCanvas();
+});
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.innerText = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+window.onload = () => {
+    applyViewTransform(true);
+    resizeCanvas();
+    renderPromptCategories();
+    initLockTags();
+    renderRefGallery();
+    renderWorkflowStatus();
+};
+</script>
+
 </body>
 </html>
