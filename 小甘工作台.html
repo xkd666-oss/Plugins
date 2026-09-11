@@ -49,14 +49,15 @@ header p { color: var(--text-secondary); font-size: 12px; }
     background: #121214; border: 1px solid var(--card-border); border-radius: 12px;
     overflow: hidden; touch-action: none; cursor: default; }
 .canvas-container.panning { cursor: grabbing; }
-.canvas-stage { position: absolute; inset: 0; transform-origin: center center;
+.canvas-stage { position: absolute; transform-origin: center center;
     transition: transform 0.12s linear; will-change: transform; }
 .canvas-stage.no-transition { transition: none; }
 .canvas-stage canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 #baseCanvas { z-index: 1; }
 #maskCanvas { z-index: 2; }
 #tempCanvas { z-index: 3; pointer-events: none; }
-.annotation-layer { position: absolute; inset: 0; pointer-events: none; z-index: 10; overflow: visible; }
+.annotation-layer { position: absolute; transform-origin: center center;
+    pointer-events: none; z-index: 10; overflow: visible; }
 .annotation-item { position: absolute; pointer-events: auto; transform-origin: 0 0;
     display: flex; align-items: flex-start; gap: 0; user-select: none; }
 .annotation-pin { width: 22px; height: 22px; border-radius: 50%;
@@ -206,8 +207,8 @@ body.canvas-editor-open { overflow: hidden; padding-bottom: 0; }
 .editor-top-actions { display:flex; gap:6px; }
 .editor-top-actions .btn { min-height: 34px; padding: 5px 10px; font-size: 12px; }
 .editor-stage { flex: 1; min-height: 0; display: flex; align-items: center;
-    justify-content: center; padding: 12px; overflow: hidden; }
-.editor-stage .canvas-block { width: min(100%, 1200px); height: 100%; justify-content: center; }
+    justify-content: center; padding: 12px; overflow: hidden; position: relative; }
+.editor-stage .canvas-block { width: 100%; height: 100%; justify-content: center; }
 .editor-stage .canvas-container { width: 100%; height: 100%; aspect-ratio: auto;
     max-height: none; flex: 1 1 auto; }
 .canvas-entry-card { display: flex; align-items: center; justify-content: space-between;
@@ -217,6 +218,279 @@ body.canvas-editor-open { overflow: hidden; padding-bottom: 0; }
 .canvas-entry-info b { display:block; font-size:13px; margin-bottom:3px; }
 .canvas-entry-info span { color:var(--text-secondary); font-size:11px; }
 .editor-open-btn { white-space: nowrap; }
+
+/* ===== 编辑页图库抽屉 ===== */
+.editor-gallery-drawer {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+}
+.editor-gallery-trigger {
+    pointer-events: auto;
+    width: 40px;
+    height: 88px;
+    border-radius: 20px 0 0 20px;
+    background: rgba(28,28,30,0.95);
+    border: 1px solid var(--card-border);
+    border-right: 0;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    box-shadow: -6px 0 20px rgba(0,0,0,0.45);
+    transition: background 0.2s;
+}
+.editor-gallery-trigger:hover {
+    background: rgba(40,40,44,0.98);
+}
+.editor-gallery-trigger .trigger-icon {
+    font-size: 18px;
+    line-height: 1;
+}
+.editor-gallery-trigger .trigger-count {
+    font-size: 10px;
+    font-weight: 700;
+    color: #FF9F0A;
+    background: rgba(255,159,10,0.15);
+    padding: 1px 5px;
+    border-radius: 8px;
+    min-width: 18px;
+    text-align: center;
+}
+.editor-gallery-panel {
+    pointer-events: auto;
+    position: absolute;
+    right: 40px;
+    top: 50%;
+    transform: translateY(-50%) translateX(20px);
+    width: 0;
+    max-width: min(360px, 92vw);
+    max-height: 70vh;
+    background: rgba(20,20,22,0.98);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+}
+.editor-gallery-drawer.open .editor-gallery-panel {
+    width: 340px;
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(-50%) translateX(0);
+}
+.editor-gallery-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--card-border);
+    flex-shrink: 0;
+}
+.editor-gallery-title {
+    font-size: 13px;
+    font-weight: 600;
+}
+.editor-gallery-count {
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: rgba(120,120,128,0.18);
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 4px;
+    margin-right: auto;
+}
+.editor-gallery-close {
+    background: rgba(120,120,128,0.25);
+    border: none;
+    color: #fff;
+    border-radius: 8px;
+    width: 30px;
+    height: 30px;
+    font-size: 16px;
+    cursor: pointer;
+}
+.editor-gallery-hint {
+    font-size: 11px;
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--card-border);
+    flex-shrink: 0;
+}
+.editor-gallery-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+/* 每个图库项 */
+.editor-gallery-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-radius: 10px;
+    background: rgba(120,120,128,0.12);
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.editor-gallery-item:hover {
+    background: rgba(120,120,128,0.22);
+}
+.editor-gallery-item.active {
+    border-color: var(--accent-color);
+    background: rgba(10,132,255,0.15);
+}
+.editor-gallery-item .item-thumb {
+    width: 56px;
+    height: 42px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #000;
+    flex-shrink: 0;
+}
+.editor-gallery-item .item-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.editor-gallery-item .item-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.editor-gallery-item .item-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+}
+.editor-gallery-item .item-role {
+    font-size: 10px;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.editor-gallery-item .item-badges {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.editor-gallery-item .item-badge {
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+}
+.editor-gallery-item .item-badge.anno {
+    background: rgba(255,159,10,0.25);
+    color: #FF9F0A;
+}
+.editor-gallery-item .item-badge.mask {
+    background: rgba(48,209,88,0.2);
+    color: #30D158;
+}
+.editor-gallery-item .item-role-strip {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    border-radius: 10px 0 0 10px;
+}
+
+/* 空状态：大的上传按钮 */
+.editor-gallery-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 40px 16px;
+    text-align: center;
+}
+.editor-gallery-empty-icon {
+    font-size: 42px;
+    opacity: 0.6;
+}
+.editor-gallery-empty-text {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+.editor-gallery-empty-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: var(--accent-color);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    min-height: 46px;
+    transition: transform 0.12s, opacity 0.2s;
+}
+.editor-gallery-empty-btn:active {
+    transform: scale(0.96);
+    opacity: 0.85;
+}
+.editor-gallery-empty-btn input { display: none; }
+
+/* 有图时：追加按钮 */
+.editor-gallery-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    border: 2px dashed rgba(255,255,255,0.2);
+    border-radius: 12px;
+    background: rgba(120,120,128,0.08);
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-top: 4px;
+    min-height: 60px;
+}
+.editor-gallery-add:hover {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+    background: rgba(10,132,255,0.08);
+}
+.editor-gallery-add .plus-icon {
+    font-size: 20px;
+    font-weight: 300;
+    line-height: 1;
+}
+.editor-gallery-add input { display: none; }
 
 /* ===== 主工具栏（常驻） ===== */
 .editor-main-toolbar {
@@ -366,6 +640,72 @@ body.canvas-editor-open { overflow: hidden; padding-bottom: 0; }
     }
     .drawer-section .canvas-toolbar::-webkit-scrollbar { display: none; }
     .drawer-section .tool-btn { flex: 0 0 auto; min-height: 32px; padding: 6px 9px; }
+
+    /* 图库抽屉移动端 */
+    .editor-gallery-drawer {
+        top: auto;
+        bottom: 90px;
+        transform: none;
+        right: 0;
+    }
+    .editor-gallery-trigger {
+        width: 36px;
+        height: 72px;
+    }
+    .editor-gallery-panel {
+        position: fixed;
+        right: 0;
+        left: 0;
+        bottom: 0;
+        top: auto;
+        transform: translateY(100%);
+        width: 100%;
+        max-width: none;
+        max-height: 60vh;
+        border-radius: 16px 16px 0 0;
+    }
+    .editor-gallery-drawer.open .editor-gallery-panel {
+        width: 100%;
+        transform: translateY(0);
+    }
+    .editor-gallery-scroll {
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+    .editor-gallery-item {
+        flex-direction: column;
+        min-width: 88px;
+        width: 88px;
+        padding: 6px;
+    }
+    .editor-gallery-item .item-thumb {
+        width: 100%;
+        height: 60px;
+    }
+    .editor-gallery-item .item-info {
+        width: 100%;
+        align-items: center;
+        text-align: center;
+    }
+    .editor-gallery-item .item-role {
+        display: none;
+    }
+    .editor-gallery-item .item-role-strip {
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: auto;
+        width: 100%;
+        height: 3px;
+        border-radius: 10px 10px 0 0;
+    }
+    .editor-gallery-add {
+        flex-direction: column;
+        min-width: 88px;
+        width: 88px;
+        margin-top: 0;
+    }
 }
 @media (max-width: 600px) and (orientation: landscape) {
     .canvas-container { height: min(62svh, 420px); min-height: 180px; }
@@ -430,7 +770,7 @@ body.canvas-editor-open { overflow: hidden; padding-bottom: 0; }
                 <div style="margin-top: 10px;">
                     <div class="control-group-title">📸 多参考图/底图管理（统一标识编号）</div>
                     <div class="ref-gallery-hint">
-                        <span>顺序 = 提示词中 <b>Image_N</b> 的编号顺序 · 🟠 徽标 = 该图标签数</span>
+                        <span>顺序 = 提示词中 <b>Image_N</b> 的编号顺序 · 🟠 徽标 = 该图标签数 · <b>双击缩略图进入编辑</b></span>
                     </div>
                     <div class="ref-gallery" id="refGallery"></div>
                     <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
@@ -521,6 +861,23 @@ body.canvas-editor-open { overflow: hidden; padding-bottom: 0; }
                     <canvas id="tempCanvas"></canvas>
                 </div>
                 <div class="annotation-layer" id="annotationLayer"></div>
+            </div>
+        </div>
+
+        <!-- 隐藏式图库：右侧滑出 -->
+        <div class="editor-gallery-drawer" id="editorGalleryDrawer">
+            <button class="editor-gallery-trigger" id="editorGalleryTrigger" onclick="toggleEditorGallery(event)" title="多参考图/底图管理器">
+                <span class="trigger-icon">📚</span>
+                <span class="trigger-count" id="editorGalleryCount">0</span>
+            </button>
+            <div class="editor-gallery-panel" id="editorGalleryPanel">
+                <div class="editor-gallery-header">
+                    <span class="editor-gallery-title">📚 图库</span>
+                    <span class="editor-gallery-count" id="editorGalleryCountLabel">0 张</span>
+                    <button class="editor-gallery-close" onclick="closeEditorGallery()">×</button>
+                </div>
+                <div class="editor-gallery-hint">左右滑动切换 · 点击切换编辑图</div>
+                <div class="editor-gallery-scroll" id="editorGalleryScroll"></div>
             </div>
         </div>
     </div>
@@ -683,6 +1040,9 @@ let draggingAnno = null;
 const ANNO_COLORS = ['#FF9F0A', '#FF3B30', '#30D158', '#0A84FF', '#AF52DE', '#5AC8FA'];
 let currentAnnoColor = ANNO_COLORS[0];
 
+/* ===== 画布基准尺寸（抽屉收起时的稳定尺寸） ===== */
+let canvasBaseSize = { w: 0, h: 0 };
+
 const ROLE_COLORS = {
     "Base Image": "#0A84FF",
     "Object Source": "#AF52DE",
@@ -748,6 +1108,18 @@ const PROMPT_TEMPLATES = {
  * ============================================================ */
 function clampScale(s) { return Math.max(0.1, Math.min(8, s)); }
 
+function getLogicalStageSize() {
+    const rot = ((viewRotation % 360) + 360) % 360;
+    const isSide = (rot === 90 || rot === 270);
+    const baseW = canvasBaseSize.w || 800;
+    const baseH = canvasBaseSize.h || 600;
+    return {
+        w: isSide ? baseH : baseW,
+        h: isSide ? baseW : baseH,
+        isSide
+    };
+}
+
 function applyViewTransform(skipTransition) {
     if (!canvasStage || !container) return;
 
@@ -758,17 +1130,35 @@ function applyViewTransform(skipTransition) {
     const scaleX = viewFlipH ? -1 : 1;
     const scaleY = viewFlipV ? -1 : 1;
 
+    const logical = getLogicalStageSize();
     const rect = container.getBoundingClientRect();
-    canvasStage.style.width = rect.width + 'px';
-    canvasStage.style.height = rect.height + 'px';
-    canvasStage.style.left = '0px';
-    canvasStage.style.top = '0px';
+
+    canvasStage.style.width = logical.w + 'px';
+    canvasStage.style.height = logical.h + 'px';
+
+    const offsetX = (rect.width - logical.w) / 2;
+    const offsetY = (rect.height - logical.h) / 2;
+    canvasStage.style.left = offsetX + 'px';
+    canvasStage.style.top = offsetY + 'px';
 
     canvasStage.style.transform =
         `translate(${viewOffsetX}px, ${viewOffsetY}px) ` +
         `scale(${viewScale}) ` +
         `rotate(${rot}deg) ` +
         `scale(${scaleX}, ${scaleY})`;
+
+    if (annotationLayer) {
+        annotationLayer.style.width = logical.w + 'px';
+        annotationLayer.style.height = logical.h + 'px';
+        annotationLayer.style.left = offsetX + 'px';
+        annotationLayer.style.top = offsetY + 'px';
+        annotationLayer.style.transform =
+            `translate(${viewOffsetX}px, ${viewOffsetY}px) ` +
+            `scale(${viewScale}) ` +
+            `rotate(${rot}deg) ` +
+            `scale(${scaleX}, ${scaleY})`;
+        annotationLayer.style.transformOrigin = 'center center';
+    }
 
     const lbl = document.getElementById('viewStatusLabel');
     if (lbl) {
@@ -779,15 +1169,6 @@ function applyViewTransform(skipTransition) {
     }
     const zl = document.getElementById('zoomLabel');
     if (zl) zl.textContent = Math.round(viewScale * 100) + '%';
-
-    if (annotationLayer) {
-        annotationLayer.style.transform = canvasStage.style.transform;
-        annotationLayer.style.transformOrigin = 'center center';
-        annotationLayer.style.width = rect.width + 'px';
-        annotationLayer.style.height = rect.height + 'px';
-        annotationLayer.style.left = '0px';
-        annotationLayer.style.top = '0px';
-    }
 
     if (skipTransition) {
         requestAnimationFrame(() => canvasStage.classList.remove('no-transition'));
@@ -893,8 +1274,9 @@ function endPan() {
 function resizeCanvas() {
     applyViewTransform(true);
 
-    const stageW = Math.round(container.clientWidth);
-    const stageH = Math.round(container.clientHeight);
+    const logical = getLogicalStageSize();
+    const stageW = Math.round(logical.w);
+    const stageH = Math.round(logical.h);
     if (stageW === 0 || stageH === 0) return;
 
     [baseCanvas, maskCanvas, tempCanvas].forEach(c => {
@@ -916,7 +1298,7 @@ function initWorkspace() {
     baseCtx.fillStyle = '#8E8E93';
     baseCtx.font = '14px -apple-system';
     baseCtx.textAlign = 'center';
-    baseCtx.fillText('未加载图像 (请在上方上传底图)', baseCanvas.width / 2, baseCanvas.height / 2);
+    baseCtx.fillText('未加载图像 (请点击右侧 📚 图库上传)', baseCanvas.width / 2, baseCanvas.height / 2);
 }
 
 function getContainRect(imgW, imgH, cW, cH) {
@@ -945,12 +1327,13 @@ function getCanvasCoords(clientX, clientY) {
     if (viewFlipH) rx = -rx;
     if (viewFlipV) ry = -ry;
 
-    const localX = rect.width / 2 + rx;
-    const localY = rect.height / 2 + ry;
+    const logical = getLogicalStageSize();
+    const localX = logical.w / 2 + rx;
+    const localY = logical.h / 2 + ry;
 
     return {
-        x: localX * (tempCanvas.width / rect.width),
-        y: localY * (tempCanvas.height / rect.height)
+        x: localX * (tempCanvas.width / logical.w),
+        y: localY * (tempCanvas.height / logical.h)
     };
 }
 
@@ -1002,6 +1385,27 @@ function handleImageUpload(e) {
                 switchLayer(layers.length - 1);
                 renderRefGallery();
                 debouncedUpdateOutput();
+
+                // 若图库抽屉打开，刷新列表
+                const drawer = document.getElementById('editorGalleryDrawer');
+                if (drawer && drawer.classList.contains('open')) {
+                    setTimeout(() => renderEditorGallery(), 100);
+                }
+
+                // 若画布编辑页已打开，刷新画布显示
+                const page = document.getElementById('canvasEditorPage');
+                if (page && page.classList.contains('active')) {
+                    if (canvasBaseSize.w === 0 || canvasBaseSize.h === 0) {
+                        updateCanvasBaseSize();
+                    }
+                    requestAnimationFrame(() => {
+                        resizeCanvas();
+                        renderMaskOverlay();
+                        updateEditorLayerStatus();
+                        redrawTempCanvas();
+                        renderAnnotations();
+                    });
+                }
             };
             img.src = ev.target.result;
         };
@@ -1020,6 +1424,12 @@ function switchLayer(index) {
     renderCurrentActiveLayer();
     pushMaskState();
     renderRefGallery();
+
+    // 同步更新编辑页图库
+    const drawer = document.getElementById('editorGalleryDrawer');
+    if (drawer && drawer.classList.contains('open')) {
+        renderEditorGallery();
+    }
 }
 
 function recomputeHasMask(layer) {
@@ -1087,8 +1497,9 @@ function normalizedToClient(nx, ny) {
     const canvasX = containRect.x + nx * containRect.w;
     const canvasY = containRect.y + ny * containRect.h;
 
-    let dx = canvasX - maskCanvas.width / 2;
-    let dy = canvasY - maskCanvas.height / 2;
+    const logical = getLogicalStageSize();
+    let dx = canvasX - logical.w / 2;
+    let dy = canvasY - logical.h / 2;
 
     const rad = viewRotation * Math.PI / 180;
     const cos = Math.cos(rad), sin = Math.sin(rad);
@@ -1653,12 +2064,7 @@ function renderRefGallery() {
     layers.forEach((layer, idx) => {
         const item = document.createElement('div');
         item.className = `ref-item ${idx === activeLayerIndex ? 'active' : ''}`;
-        item.onclick = e => {
-            if (e.target.tagName !== 'SELECT' && !e.target.classList.contains('remove-btn')
-                && !e.target.closest('.layer-actions')) {
-                switchLayer(idx);
-            }
-        };
+        item.title = '双击进入画布编辑';
 
         const orderBadge = document.createElement('div');
         orderBadge.className = 'order-badge';
@@ -1734,6 +2140,51 @@ function renderRefGallery() {
         item.appendChild(select);
         item.appendChild(actions);
         item.appendChild(removeBtn);
+
+        // 单击：延迟切换，避免与双击冲突
+        item.onclick = e => {
+            if (e.target.tagName === 'SELECT') return;
+            if (e.target.classList.contains('remove-btn')) return;
+            if (e.target.closest('.layer-actions')) return;
+            if (item._clickTimer) clearTimeout(item._clickTimer);
+            item._clickTimer = setTimeout(() => {
+                item._clickTimer = null;
+                switchLayer(idx);
+            }, 250);
+        };
+
+        // 双击：进入编辑页
+        item.ondblclick = e => {
+            if (e.target.tagName === 'SELECT') return;
+            if (e.target.classList.contains('remove-btn')) return;
+            if (e.target.closest('.layer-actions')) return;
+            if (item._clickTimer) { clearTimeout(item._clickTimer); item._clickTimer = null; }
+            e.preventDefault();
+            e.stopPropagation();
+            switchLayer(idx);
+            openCanvasEditor();
+        };
+
+        // 移动端长按进入编辑
+        let longPressTimer = null;
+        item.addEventListener('touchstart', e => {
+            if (e.target.tagName === 'SELECT') return;
+            if (e.target.classList.contains('remove-btn')) return;
+            if (e.target.closest('.layer-actions')) return;
+            longPressTimer = setTimeout(() => {
+                longPressTimer = null;
+                if (navigator.vibrate) navigator.vibrate(30);
+                switchLayer(idx);
+                openCanvasEditor();
+            }, 600);
+        }, { passive: true });
+        item.addEventListener('touchend', () => {
+            if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+        });
+        item.addEventListener('touchmove', () => {
+            if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+        });
+
         gallery.appendChild(item);
     });
 }
@@ -1751,6 +2202,12 @@ function removeLayer(index) {
     renderRefGallery();
     renderAnnotations();
     debouncedUpdateOutput();
+
+    // 同步编辑页图库
+    const drawer = document.getElementById('editorGalleryDrawer');
+    if (drawer && drawer.classList.contains('open')) {
+        renderEditorGallery();
+    }
 }
 
 function clearAll() {
@@ -1768,6 +2225,12 @@ function clearAll() {
     renderAnnotations();
     renderWorkflowStatus();
     updateOutput();
+
+    // 同步编辑页图库    const drawer = document.getElementById('editorGalleryDrawer');
+    if (drawer && drawer.classList.contains('open')) {
+        renderEditorGallery();
+    }
+
     showToast("工作台已完全重置");
 }
 
@@ -1790,6 +2253,9 @@ function duplicateLayer(i) {
         renderCurrentActiveLayer();
         renderWorkflowStatus();
         debouncedUpdateOutput();
+
+        const drawer = document.getElementById('editorGalleryDrawer');
+        if (drawer && drawer.classList.contains('open')) renderEditorGallery();
     };
     im.src = l.imgObj.src;
 }
@@ -1803,6 +2269,9 @@ function moveLayer(i, d) {
     renderWorkflowStatus();
     debouncedUpdateOutput();
     showToast(`图层已移动至 L${n + 1}`);
+
+    const drawer = document.getElementById('editorGalleryDrawer');
+    if (drawer && drawer.classList.contains('open')) renderEditorGallery();
 }
 
 function renderPromptCategories() {
@@ -1961,6 +2430,9 @@ function loadProject() {
             renderRefGallery();
             initLockTags();
             renderWorkflowStatus();
+            if (document.getElementById('canvasEditorPage').classList.contains('active')) {
+                updateCanvasBaseSize();
+            }
             resizeCanvas();
             debouncedUpdateOutput();
             showToast('项目加载完成');
@@ -2442,7 +2914,6 @@ function toggleEditorDrawer() {
     drawer.classList.toggle('collapsed', willCollapse);
     if (icon) icon.textContent = willCollapse ? '▲' : '▼';
 }
-
 function setEditorDrawerCollapsed(collapsed) {
     const drawer = document.getElementById('editorDrawer');
     const icon = document.getElementById('editorDrawerIcon');
@@ -2451,8 +2922,244 @@ function setEditorDrawerCollapsed(collapsed) {
     if (icon) icon.textContent = collapsed ? '▲' : '▼';
 }
 
+/* ============================================================
+ *  编辑页图库抽屉
+ * ============================================================ */
+function toggleEditorGallery(e) {
+    if (e) e.stopPropagation();
+    const drawer = document.getElementById('editorGalleryDrawer');
+    if (!drawer) return;
+    const willOpen = !drawer.classList.contains('open');
+    drawer.classList.toggle('open', willOpen);
+    if (willOpen) {
+        renderEditorGallery();
+    }
+}
+function closeEditorGallery() {
+    const drawer = document.getElementById('editorGalleryDrawer');
+    if (drawer) drawer.classList.remove('open');
+}
+
+/* 点击抽屉外部关闭 */
+document.addEventListener('pointerdown', e => {
+    const drawer = document.getElementById('editorGalleryDrawer');
+    if (!drawer || !drawer.classList.contains('open')) return;
+    if (drawer.contains(e.target)) return;
+    closeEditorGallery();
+}, true);
+
+function renderEditorGallery() {
+    const scroll = document.getElementById('editorGalleryScroll');
+    const countLabel = document.getElementById('editorGalleryCountLabel');
+    const countBadge = document.getElementById('editorGalleryCount');
+    if (!scroll) return;
+
+    const n = layers.length;
+    if (countLabel) countLabel.textContent = `${n} 张`;
+    if (countBadge) countBadge.textContent = String(n);
+
+    scroll.innerHTML = '';
+
+    if (n === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'editor-gallery-empty';
+
+        const icon = document.createElement('div');
+        icon.className = 'editor-gallery-empty-icon';
+        icon.textContent = '🖼️';
+
+        const text = document.createElement('div');
+        text.className = 'editor-gallery-empty-text';
+        text.innerHTML = '还没有图像<br>上传一张开始编辑';
+
+        const btn = document.createElement('label');
+        btn.className = 'editor-gallery-empty-btn';
+        btn.innerHTML = '📤 点击上传图像';
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.multiple = true;
+        input.onchange = (e) => {
+            handleImageUpload(e);
+            setTimeout(() => renderEditorGallery(), 200);
+        };
+        btn.appendChild(input);
+
+        empty.appendChild(icon);
+        empty.appendChild(text);
+        empty.appendChild(btn);
+        scroll.appendChild(empty);
+        return;
+    }
+
+    layers.forEach((layer, idx) => {
+        const item = document.createElement('div');
+        item.className = `editor-gallery-item ${idx === activeLayerIndex ? 'active' : ''}`;
+
+        const strip = document.createElement('div');
+        strip.className = 'item-role-strip';
+        strip.style.background = getRoleColor(layer.role);
+        item.appendChild(strip);
+
+        const thumb = document.createElement('div');
+        thumb.className = 'item-thumb';
+        const img = document.createElement('img');
+        img.src = layer.imgObj.src;
+        thumb.appendChild(img);
+        item.appendChild(thumb);
+
+        const info = document.createElement('div');
+        info.className = 'item-info';
+
+        const name = document.createElement('div');
+        name.className = 'item-name';
+        name.textContent = `Image_${idx + 1}`;
+        info.appendChild(name);
+
+        const role = document.createElement('div');
+        role.className = 'item-role';
+        role.textContent = layer.role;
+        info.appendChild(role);
+
+        const badges = document.createElement('div');
+        badges.className = 'item-badges';
+        if (layer.hasMask) {
+            const b = document.createElement('span');
+            b.className = 'item-badge mask';
+            b.textContent = '蒙版';
+            badges.appendChild(b);
+        }
+        const annoCount = (layer.annotations || []).length;
+        if (annoCount > 0) {
+            const b = document.createElement('span');
+            b.className = 'item-badge anno';
+            b.textContent = `🏷️ ${annoCount}`;
+            badges.appendChild(b);
+        }
+        if (badges.childElementCount > 0) info.appendChild(badges);
+
+        item.appendChild(info);
+
+        item.onclick = () => {
+            if (idx === activeLayerIndex) return;
+            switchLayer(idx);
+            renderEditorGallery();
+            requestAnimationFrame(() => {
+                resizeCanvas();
+                renderMaskOverlay();
+                updateEditorLayerStatus();
+                redrawTempCanvas();
+                renderAnnotations();
+            });
+        };
+
+        scroll.appendChild(item);
+    });
+
+    // 追加按钮
+    const addLabel = document.createElement('label');
+    addLabel.className = 'editor-gallery-add';
+    addLabel.innerHTML = '<span class="plus-icon">＋</span><span>添加图像</span>';
+    const addInput = document.createElement('input');
+    addInput.type = 'file';
+    addInput.accept = 'image/*';
+    addInput.multiple = true;
+    addInput.onchange = (e) => {
+        handleImageUpload(e);
+        setTimeout(() => renderEditorGallery(), 200);
+    };
+    addLabel.appendChild(addInput);
+    scroll.appendChild(addLabel);
+
+    requestAnimationFrame(() => {
+        const active = scroll.querySelector('.editor-gallery-item.active');
+        if (active) {
+            active.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+        }
+    });
+}
+
+/* ============================================================
+ *  左右滑动切换编辑图
+ * ============================================================ */
+function switchToPrevLayer() {
+    if (layers.length < 2) return;
+    const next = (activeLayerIndex - 1 + layers.length) % layers.length;
+    switchLayer(next);
+    renderEditorGallery();
+    requestAnimationFrame(() => {
+        resizeCanvas();
+        renderMaskOverlay();
+        updateEditorLayerStatus();
+        redrawTempCanvas();
+        renderAnnotations();
+    });
+    showToast(`切换到 Image_${next + 1}`);
+}
+function switchToNextLayer() {
+    if (layers.length < 2) return;
+    const next = (activeLayerIndex + 1) % layers.length;
+    switchLayer(next);
+    renderEditorGallery();
+    requestAnimationFrame(() => {
+        resizeCanvas();
+        renderMaskOverlay();
+        updateEditorLayerStatus();
+        redrawTempCanvas();
+        renderAnnotations();
+    });
+    showToast(`切换到 Image_${next + 1}`);
+}
+
+/* 双指水平滑动切换图层 */
+let swipeStartX = 0;
+let swipeStartY = 0;
+let swipeStartTime = 0;
+let isSwiping = false;
+
+container.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+        const [t1, t2] = e.touches;
+        swipeStartX = (t1.clientX + t2.clientX) / 2;
+        swipeStartY = (t1.clientY + t2.clientY) / 2;
+        swipeStartTime = Date.now();
+        isSwiping = false;
+    }
+}, { passive: true });
+
+container.addEventListener('touchend', e => {
+    if (swipeStartX === 0) return;
+    if (e.touches.length === 0) {
+        swipeStartX = 0;
+        swipeStartY = 0;
+        return;
+    }
+    if (e.touches.length === 1 && !isSwiping) {
+        const t = e.touches[0];
+        const dx = t.clientX - swipeStartX;
+        const dy = t.clientY - swipeStartY;
+        const dt = Date.now() - swipeStartTime;
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 600) {
+            isSwiping = true;
+            if (dx > 0) switchToPrevLayer();
+            else switchToNextLayer();
+        }
+    }
+}, { passive: true });
+
+/* ============================================================
+ *  画布基准尺寸管理
+ * ============================================================ */
+function updateCanvasBaseSize() {
+    const rect = container.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+        canvasBaseSize = { w: rect.width, h: rect.height };
+    }
+}
+
 function openCanvasEditor() {
     setEditorDrawerCollapsed(true);
+    closeEditorGallery();
     currentTool = TOOL_NONE;
     polygonPoints = [];
     lassoPoints = [];
@@ -2464,6 +3171,7 @@ function openCanvasEditor() {
     page.classList.add('active');
     document.body.classList.add('canvas-editor-open');
     requestAnimationFrame(() => {
+        updateCanvasBaseSize();
         resizeCanvas();
         renderMaskOverlay();
         updateEditorLayerStatus();
@@ -2473,6 +3181,7 @@ function openCanvasEditor() {
 }
 
 function closeCanvasEditor() {
+    closeEditorGallery();
     const page = document.getElementById('canvasEditorPage');
     if (page) page.classList.remove('active');
     document.body.classList.remove('canvas-editor-open');
@@ -2489,6 +3198,11 @@ document.addEventListener('keydown', e => {
             closeAnnoModal();
             return;
         }
+        const gDrawer = document.getElementById('editorGalleryDrawer');
+        if (gDrawer && gDrawer.classList.contains('open')) {
+            closeEditorGallery();
+            return;
+        }
         closeCanvasEditor();
         return;
     }
@@ -2502,6 +3216,8 @@ document.addEventListener('keydown', e => {
     else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomBy(0.8); }
     else if (e.key === '0') { e.preventDefault(); zoomFit(); }
     else if (e.key === 't' || e.key === 'T') { e.preventDefault(); setTool('annotate'); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); switchToPrevLayer(); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); switchToNextLayer(); }
     else if (e.key === ' ') {
         spacePressed = true;
         container.style.cursor = 'grab';
@@ -2516,6 +3232,13 @@ document.addEventListener('keyup', e => {
 });
 
 window.addEventListener('resize', () => {
+    const editorActive = document.getElementById('canvasEditorPage').classList.contains('active');
+    if (editorActive) {
+        const drawer = document.getElementById('editorDrawer');
+        if (drawer && drawer.classList.contains('collapsed')) {
+            updateCanvasBaseSize();
+        }
+    }
     applyViewTransform();
     resizeCanvas();
 });
