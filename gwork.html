@@ -885,12 +885,12 @@ body.canvas-editor-open { overflow: hidden; padding-bottom: 0; }
     <!-- 常驻主工具栏：核心绘制 + 编辑操作 -->
     <div class="editor-main-toolbar">
         <div class="canvas-toolbar">
-            <button class="tool-btn" id="brushBtn" onclick="setTool('brush')">🖌️ 涂刷</button>
-            <button class="tool-btn" id="lassoBtn" onclick="setTool('lasso')">➰ 套索</button>
-            <button class="tool-btn" id="polygonBtn" onclick="setTool('polygon')">📐 多边形</button>
+            <button class="tool-btn" id="brushBtn" onclick="setTool('brush')" title="涂刷（再点一次取消）">🖌️ 涂刷</button>
+            <button class="tool-btn" id="lassoBtn" onclick="setTool('lasso')" title="套索（再点一次取消）">➰ 套索</button>
+            <button class="tool-btn" id="polygonBtn" onclick="setTool('polygon')" title="多边形（再点一次取消）">📐 多边形</button>
             <button class="tool-btn" id="finishPolyBtn" style="display:none; background:#30D158;" onclick="finishPolygon()">✅ 完成</button>
-            <button class="tool-btn" id="eraserBtn" onclick="setTool('eraser')">🧹 橡皮擦</button>
-            <button class="tool-btn" id="annoBtn" onclick="setTool('annotate')" style="background:rgba(255,159,10,0.25);">🏷️ 打标签</button>
+            <button class="tool-btn" id="eraserBtn" onclick="setTool('eraser')" title="橡皮擦（再点一次取消）">🧹 橡皮擦</button>
+            <button class="tool-btn" id="annoBtn" onclick="setTool('annotate')" title="打标签（再点一次取消）" style="background:rgba(255,159,10,0.25);">🏷️ 打标签</button>
             <button class="tool-btn" onclick="undoMask()">↩️ 撤销</button>
             <button class="tool-btn" onclick="redoMask()">↪️ 重做</button>
             <button class="tool-btn" onclick="clearCurrentMask()">清空当前蒙版</button>
@@ -1126,11 +1126,9 @@ function clampViewOffset() {
     const logical = getLogicalStageSize();
     const rect = container.getBoundingClientRect();
 
-    // stage 缩放后的视觉尺寸
     const visualW = logical.w * viewScale;
     const visualH = logical.h * viewScale;
 
-    // 允许 stage 中心最多偏出 container 边缘（保留 40px 可见区）
     const maxOffsetX = Math.max(0, (rect.width + visualW) / 2 - 40);
     const maxOffsetY = Math.max(0, (rect.height + visualH) / 2 - 40);
 
@@ -1151,18 +1149,13 @@ function applyViewTransform(skipTransition) {
     const logical = getLogicalStageSize();
     const rect = container.getBoundingClientRect();
 
-    // 限制偏移，防止图像飞出
     clampViewOffset();
 
-    // stage 逻辑尺寸
     canvasStage.style.width = logical.w + 'px';
     canvasStage.style.height = logical.h + 'px';
-
-    // 关键：left/top 固定为 0，居中通过 transform 的 translate 实现
     canvasStage.style.left = '0px';
     canvasStage.style.top = '0px';
 
-    // 居中偏移（把 stage 中心对齐到 container 中心）
     const centerOffsetX = (rect.width - logical.w) / 2;
     const centerOffsetY = (rect.height - logical.h) / 2;
 
@@ -1337,23 +1330,39 @@ function getContainRect(imgW, imgH, cW, cH) {
 
 function getCanvasCoords(clientX, clientY) {
     const rect = container.getBoundingClientRect();
-    let dx = clientX - (rect.left + rect.width / 2);
-    let dy = clientY - (rect.top + rect.height / 2);
+    const logical = getLogicalStageSize();
 
+    // 居中偏移（与 applyViewTransform 一致）
+    const centerOffsetX = (rect.width - logical.w) / 2;
+    const centerOffsetY = (rect.height - logical.h) / 2;
+
+    // stage 中心在屏幕上的位置
+    const stageCenterScreenX = rect.left + centerOffsetX + logical.w / 2;
+    const stageCenterScreenY = rect.top + centerOffsetY + logical.h / 2;
+
+    // 屏幕坐标相对 stage 中心的偏移
+    let dx = clientX - stageCenterScreenX;
+    let dy = clientY - stageCenterScreenY;
+
+    // 反用户平移
     dx -= viewOffsetX;
     dy -= viewOffsetY;
+
+    // 反缩放
     dx /= viewScale;
     dy /= viewScale;
 
+    // 反旋转
     const rad = -viewRotation * Math.PI / 180;
     const cos = Math.cos(rad), sin = Math.sin(rad);
     let rx = dx * cos - dy * sin;
     let ry = dx * sin + dy * cos;
 
+    // 反翻转
     if (viewFlipH) rx = -rx;
     if (viewFlipV) ry = -ry;
 
-    const logical = getLogicalStageSize();
+    // stage 本地坐标
     const localX = logical.w / 2 + rx;
     const localY = logical.h / 2 + ry;
 
@@ -1412,13 +1421,11 @@ function handleImageUpload(e) {
                 renderRefGallery();
                 debouncedUpdateOutput();
 
-                // 若图库抽屉打开，刷新列表
                 const drawer = document.getElementById('editorGalleryDrawer');
                 if (drawer && drawer.classList.contains('open')) {
                     setTimeout(() => renderEditorGallery(), 100);
                 }
 
-                // 若画布编辑页已打开，刷新画布显示
                 const page = document.getElementById('canvasEditorPage');
                 if (page && page.classList.contains('active')) {
                     if (canvasBaseSize.w === 0 || canvasBaseSize.h === 0) {
@@ -1451,7 +1458,6 @@ function switchLayer(index) {
     pushMaskState();
     renderRefGallery();
 
-    // 同步更新编辑页图库
     const drawer = document.getElementById('editorGalleryDrawer');
     if (drawer && drawer.classList.contains('open')) {
         renderEditorGallery();
@@ -1556,6 +1562,9 @@ function renderAnnotations() {
     if (!layer || !layer.annotations) return;
     if (!annotationsVisible) return;
 
+    // 计算图像在 canvas 本地坐标系中的 rect
+    const containRect = getContainRect(layer.rawWidth, layer.rawHeight, maskCanvas.width, maskCanvas.height);
+
     layer.annotations.forEach((anno, idx) => {
         const item = document.createElement('div');
         item.className = 'annotation-item';
@@ -1600,12 +1609,11 @@ function renderAnnotations() {
         item.appendChild(pin);
         item.appendChild(card);
 
-        const clientPos = normalizedToClient(anno.nx, anno.ny);
-        if (clientPos) {
-            const layerRect = annotationLayer.getBoundingClientRect();
-            item.style.left = (clientPos.x - layerRect.left - 11) + 'px';
-            item.style.top  = (clientPos.y - layerRect.top  - 11) + 'px';
-        }
+        // 关键修复：标签位置直接用 annotationLayer 本地像素坐标
+        const localX = containRect.x + anno.nx * containRect.w;
+        const localY = containRect.y + anno.ny * containRect.h;
+        item.style.left = (localX - 11) + 'px';
+        item.style.top  = (localY - 11) + 'px';
 
         pin.addEventListener('pointerdown', e => {
             if (currentTool !== 'annotate') return;
@@ -2071,18 +2079,58 @@ function autoToggleInpaintTag(forceState) {
     debouncedUpdateOutput();
 }
 
+/* ============================================================
+ *  工具切换（支持再点一次取消）
+ * ============================================================ */
+function getToolName(tool) {
+    return {
+        brush: '涂刷',
+        lasso: '套索',
+        polygon: '多边形',
+        eraser: '橡皮擦',
+        annotate: '打标签'
+    }[tool] || tool;
+}
+
 function setTool(tool) {
-    currentTool = tool;
+    // 再点同一个工具 → 取消激活
+    const willDeactivate = (currentTool === tool);
+    currentTool = willDeactivate ? TOOL_NONE : tool;
+
+    // 清空所有绘制按钮的激活态
     document.querySelectorAll('.canvas-toolbar .tool-btn').forEach(b => b.classList.remove('active'));
-    if (tool === 'brush') document.getElementById('brushBtn').classList.add('active');
-    if (tool === 'lasso') document.getElementById('lassoBtn').classList.add('active');
-    if (tool === 'polygon') document.getElementById('polygonBtn').classList.add('active');
-    if (tool === 'eraser') document.getElementById('eraserBtn').classList.add('active');
-    if (tool === 'annotate') document.getElementById('annoBtn').classList.add('active');
-    document.getElementById('finishPolyBtn').style.display = (tool === 'polygon') ? 'inline-flex' : 'none';
+    document.querySelectorAll('.editor-main-toolbar .tool-btn').forEach(b => b.classList.remove('active'));
+
+    // 按当前工具重新激活
+    const toolBtnMap = {
+        brush: 'brushBtn',
+        lasso: 'lassoBtn',
+        polygon: 'polygonBtn',
+        eraser: 'eraserBtn',
+        annotate: 'annoBtn'
+    };
+    const btnId = toolBtnMap[currentTool];
+    if (btnId) {
+        const b = document.getElementById(btnId);
+        if (b) b.classList.add('active');
+    }
+
+    // 多边形"完成"按钮
+    document.getElementById('finishPolyBtn').style.display =
+        (currentTool === 'polygon') ? 'inline-flex' : 'none';
+
+    // 清理临时绘制状态
     polygonPoints = [];
     lassoPoints = [];
     redrawTempCanvas();
+
+    // 提示
+    if (currentTool === TOOL_NONE) {
+        container.style.cursor = panModeToggle ? 'grab' : 'default';
+        showToast('已退出绘制模式');
+    } else {
+        showToast(`已选择：${getToolName(currentTool)}`);
+    }
 }
 
 function renderRefGallery() {
@@ -2168,7 +2216,6 @@ function renderRefGallery() {
         item.appendChild(actions);
         item.appendChild(removeBtn);
 
-        // 单击：延迟切换，避免与双击冲突
         item.onclick = e => {
             if (e.target.tagName === 'SELECT') return;
             if (e.target.classList.contains('remove-btn')) return;
@@ -2180,7 +2227,6 @@ function renderRefGallery() {
             }, 250);
         };
 
-        // 双击：进入编辑页
         item.ondblclick = e => {
             if (e.target.tagName === 'SELECT') return;
             if (e.target.classList.contains('remove-btn')) return;
@@ -2192,7 +2238,6 @@ function renderRefGallery() {
             openCanvasEditor();
         };
 
-        // 移动端长按进入编辑
         let longPressTimer = null;
         item.addEventListener('touchstart', e => {
             if (e.target.tagName === 'SELECT') return;
@@ -2230,7 +2275,6 @@ function removeLayer(index) {
     renderAnnotations();
     debouncedUpdateOutput();
 
-    // 同步编辑页图库
     const drawer = document.getElementById('editorGalleryDrawer');
     if (drawer && drawer.classList.contains('open')) {
         renderEditorGallery();
@@ -2253,7 +2297,6 @@ function clearAll() {
     renderWorkflowStatus();
     updateOutput();
 
-    // 同步编辑页图库
     const drawer = document.getElementById('editorGalleryDrawer');
     if (drawer && drawer.classList.contains('open')) {
         renderEditorGallery();
@@ -2968,7 +3011,6 @@ function closeEditorGallery() {
     if (drawer) drawer.classList.remove('open');
 }
 
-/* 点击抽屉外部关闭 */
 document.addEventListener('pointerdown', e => {
     const drawer = document.getElementById('editorGalleryDrawer');
     if (!drawer || !drawer.classList.contains('open')) return;
@@ -3084,7 +3126,6 @@ function renderEditorGallery() {
         scroll.appendChild(item);
     });
 
-    // 追加按钮
     const addLabel = document.createElement('label');
     addLabel.className = 'editor-gallery-add';
     addLabel.innerHTML = '<span class="plus-icon">＋</span><span>添加图像</span>';
@@ -3139,7 +3180,6 @@ function switchToNextLayer() {
     showToast(`切换到 Image_${next + 1}`);
 }
 
-/* 双指水平滑动切换图层 */
 let swipeStartX = 0;
 let swipeStartY = 0;
 let swipeStartTime = 0;
@@ -3192,6 +3232,7 @@ function openCanvasEditor() {
     polygonPoints = [];
     lassoPoints = [];
     document.querySelectorAll('.canvas-toolbar .tool-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.editor-main-toolbar .tool-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('finishPolyBtn').style.display = 'none';
 
     const page = document.getElementById('canvasEditorPage');
@@ -3222,18 +3263,32 @@ document.addEventListener('keydown', e => {
     const editorOpen = document.getElementById('canvasEditorPage')?.classList.contains('active');
 
     if (e.key === 'Escape' && editorOpen) {
+        // 1. 关闭标签编辑弹窗
         if (document.getElementById('annoModalMask').classList.contains('active')) {
             closeAnnoModal();
             return;
         }
+        // 2. 关闭图库抽屉
         const gDrawer = document.getElementById('editorGalleryDrawer');
         if (gDrawer && gDrawer.classList.contains('open')) {
             closeEditorGallery();
             return;
         }
+        // 3. 正在绘制 → 结束当前笔画
+        if (isDrawing) {
+            handleEnd();
+            return;
+        }
+        // 4. 有工具激活 → 退出工具
+        if (currentTool !== TOOL_NONE) {
+            setTool(currentTool);
+            return;
+        }
+        // 5. 关闭编辑页
         closeCanvasEditor();
         return;
     }
+
     if (!editorOpen) return;
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
 
