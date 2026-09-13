@@ -1,0 +1,2303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>小甘-SU转效果图工作台</title>
+  <style>
+    :root {
+      --bg-color: #000000;
+      --card-bg: rgba(255, 255, 255, 0.05);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --card-border-focus: rgba(255, 255, 255, 0.3);
+      --input-bg: rgba(0, 0, 0, 0.5);
+      --text-primary: #FFFFFF;
+      --text-secondary: rgba(255, 255, 255, 0.65);
+      --accent-blue: #0A84FF;
+      --accent-blue-hover: #0071E3;
+      --accent-green: #30D158;
+      --accent-red: #FF453A;
+      --chip-bg: rgba(255, 255, 255, 0.06);
+      --chip-border: rgba(255, 255, 255, 0.12);
+      --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-primary);
+      font-family: var(--font-stack);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 28px;
+      overflow-x: hidden;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1840px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .header-left {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    header h1 {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      color: #FFFFFF;
+    }
+
+    .header-sub {
+      font-size: 11.5px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      color: rgba(255, 255, 255, 0.75);
+      text-transform: uppercase;
+    }
+
+    .main-layout {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 18px;
+      align-items: start;
+      transition: grid-template-columns 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+    }
+
+    .main-layout.sidebar-collapsed {
+      grid-template-columns: 0px 1fr;
+      gap: 0px;
+    }
+
+    .sidebar-wrapper {
+      width: 340px;
+      transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: hidden;
+    }
+
+    .main-layout.sidebar-collapsed .sidebar-wrapper {
+      opacity: 0;
+      transform: translateX(-24px);
+      pointer-events: none;
+    }
+
+    .floating-expand-btn {
+      position: absolute;
+      top: 16px;
+      left: 0;
+      z-index: 50;
+      background: rgba(28, 28, 30, 0.92);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-left: none;
+      border-radius: 0 10px 10px 0;
+      padding: 10px 9px 10px 7px;
+      color: var(--text-primary);
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 4px 6px 18px rgba(0, 0, 0, 0.4);
+      transition: all 0.2s ease;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .floating-expand-btn:hover {
+      background: rgba(44, 44, 46, 0.98);
+      color: var(--accent-blue);
+      padding-left: 10px;
+    }
+
+    .main-layout.sidebar-collapsed .floating-expand-btn {
+      display: inline-flex;
+    }
+
+    .glass-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+      display: flex;
+      flex-direction: column;
+      gap: 13px;
+    }
+
+    .card-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-title-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title-badge {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-secondary);
+    }
+
+    .btn-collapse-triangle {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--card-border);
+      border-radius: 7px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      transition: all 0.18s ease;
+    }
+
+    .btn-collapse-triangle:hover {
+      background: rgba(255, 255, 255, 0.16);
+      color: #FFFFFF;
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .btn-collapse-triangle svg {
+      width: 12px;
+      height: 12px;
+      fill: currentColor;
+      transition: transform 0.18s ease;
+    }
+
+    .btn-collapse-triangle:hover svg {
+      transform: translateX(-1.5px);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-label-hint {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.4);
+    }
+
+    input[type="text"], select, textarea {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 9px;
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 12.5px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"] {
+      height: 36px;
+      padding: 0 10px;
+    }
+
+    select {
+      height: 36px;
+      padding: 0 32px 0 10px;
+      appearance: none;
+      -webkit-appearance: none;
+      cursor: pointer;
+    }
+
+    select option {
+      background-color: #1C1C1E;
+      color: #FFFFFF;
+    }
+
+    .select-wrapper {
+      position: relative;
+    }
+
+    .select-chevron {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    textarea {
+      min-height: 52px;
+      padding: 8px 10px;
+      resize: vertical;
+      line-height: 1.4;
+    }
+
+    input[type="text"]:focus, select:focus, textarea:focus {
+      border-color: var(--card-border-focus);
+    }
+
+    .checkbox-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 5px;
+    }
+
+    .checkbox-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--chip-bg);
+      border: 1px solid var(--chip-border);
+      border-radius: 8px;
+      padding: 6px 9px;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.18s ease;
+    }
+
+    .checkbox-chip:hover {
+      background: rgba(255, 255, 255, 0.09);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .checkbox-chip.active {
+      background: rgba(10, 132, 255, 0.15);
+      border-color: var(--accent-blue);
+    }
+
+    .checkbox-chip input {
+      display: none;
+    }
+
+    .custom-box {
+      width: 14px;
+      height: 14px;
+      border-radius: 3.5px;
+      border: 1.5px solid rgba(255, 255, 255, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .checkbox-chip.active .custom-box {
+      background: var(--accent-blue);
+      border-color: var(--accent-blue);
+    }
+
+    .custom-box svg {
+      width: 8.5px;
+      height: 8.5px;
+      stroke: #FFFFFF;
+      stroke-width: 2.5;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      display: none;
+    }
+
+    .checkbox-chip.active .custom-box svg {
+      display: block;
+    }
+
+    .chip-text {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .chip-title {
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .chip-desc {
+      font-size: 10.5px;
+      color: var(--text-secondary);
+    }
+
+    .workspace-column {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      min-width: 0;
+      width: 100%;
+    }
+
+    .canvas-card {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .canvas-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 7px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--card-border);
+    }
+
+    .toolbar-left, .toolbar-right {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .tool-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--card-border);
+      color: var(--text-primary);
+      padding: 5px 11px;
+      border-radius: 7px;
+      font-size: 11.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.16s ease;
+      user-select: none;
+    }
+
+    .tool-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .tool-btn.active {
+      background: var(--accent-blue);
+      border-color: var(--accent-blue);
+      color: #FFFFFF;
+    }
+
+    .tool-btn-finish {
+      background: rgba(48, 209, 88, 0.18);
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+      font-weight: 600;
+    }
+
+    .tool-btn-finish:hover {
+      background: rgba(48, 209, 88, 0.28);
+    }
+
+    .tool-btn-cancel {
+      background: rgba(255, 69, 58, 0.15);
+      border-color: var(--accent-red);
+      color: var(--accent-red);
+    }
+
+    .tool-btn-cancel:hover {
+      background: rgba(255, 69, 58, 0.25);
+    }
+
+    .color-swatches {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-left: 2px;
+    }
+
+    .color-swatch {
+      width: 17px;
+      height: 17px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+
+    .color-swatch.active {
+      transform: scale(1.25);
+      border-color: #FFFFFF;
+    }
+
+    .bg-mode-capsule {
+      display: flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--card-border);
+      border-radius: 7px;
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .bg-mode-option {
+      font-size: 11px;
+      color: var(--text-secondary);
+      padding: 3px 8px;
+      border-radius: 5px;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s ease;
+    }
+
+    .bg-mode-option.active {
+      background: rgba(255, 255, 255, 0.16);
+      color: #FFFFFF;
+      font-weight: 600;
+    }
+
+    .canvas-stage-wrapper {
+      display: grid;
+      grid-template-columns: 1fr 310px;
+      gap: 14px;
+      align-items: stretch;
+      width: 100%;
+      min-height: 720px;
+    }
+
+    .canvas-stage-wrapper.no-labels {
+      grid-template-columns: 1fr;
+    }
+
+    .canvas-viewport {
+      position: relative;
+      width: 100%;
+      height: 720px;
+      background: #111112;
+      border-radius: 10px;
+      border: 1px solid var(--card-border);
+      overflow: hidden;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overscroll-behavior: contain;
+      touch-action: none;
+    }
+
+    .canvas-viewport.panning {
+      cursor: grab !important;
+    }
+
+    .canvas-viewport.panning:active {
+      cursor: grabbing !important;
+    }
+
+    .zoom-hud {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(28, 28, 30, 0.88);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 4px 8px;
+      z-index: 10;
+    }
+
+    .zoom-btn {
+      background: none;
+      border: none;
+      color: var(--text-primary);
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .zoom-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .zoom-text {
+      font-size: 11px;
+      color: var(--text-secondary);
+      min-width: 42px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .empty-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      color: var(--text-secondary);
+      font-size: 13px;
+      cursor: pointer;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .empty-placeholder svg {
+      width: 44px;
+      height: 44px;
+      stroke: rgba(255, 255, 255, 0.35);
+      stroke-width: 1.5;
+      fill: none;
+    }
+
+    #drawingCanvas {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      cursor: crosshair;
+      will-change: transform;
+    }
+
+    .labels-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: rgba(20, 20, 22, 0.85);
+      backdrop-filter: blur(16px);
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid var(--card-border);
+      height: 720px;
+      overflow: hidden;
+    }
+
+    .labels-panel-header {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .labels-panel-title {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .labels-count-badge {
+      font-size: 10.5px;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: rgba(10, 132, 255, 0.2);
+      color: var(--accent-blue);
+      font-weight: 600;
+    }
+
+    .labels-panel-hint {
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.35;
+    }
+
+    .labels-list-scroll {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+      flex: 1;
+      padding-right: 2px;
+    }
+
+    .labels-list-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .labels-list-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.18);
+      border-radius: 2px;
+    }
+
+    .label-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 8px 10px;
+      border-radius: 8px;
+      transition: all 0.18s ease;
+    }
+
+    .label-item:hover {
+      background: rgba(255, 255, 255, 0.07);
+      border-color: rgba(255, 255, 255, 0.16);
+    }
+
+    .label-item-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .label-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-weight: 600;
+      font-size: 11.5px;
+    }
+
+    .label-color-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .label-type-tag {
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-secondary);
+    }
+
+    .label-desc-input {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 6px;
+      color: #FFFFFF;
+      font-size: 11.5px;
+      padding: 5px 8px;
+      width: 100%;
+      height: 28px;
+    }
+
+    .label-desc-input:focus {
+      border-color: var(--accent-blue);
+      background: rgba(0, 0, 0, 0.6);
+    }
+
+    .btn-icon-del {
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.35);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      padding: 3px;
+      border-radius: 4px;
+      transition: color 0.15s, background 0.15s;
+    }
+
+    .btn-icon-del:hover {
+      color: var(--accent-red);
+      background: rgba(255, 69, 58, 0.15);
+    }
+
+    .mode-tabs {
+      display: flex;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 3px;
+      border-radius: 10px;
+      border: 1px solid var(--card-border);
+      gap: 4px;
+    }
+
+    .mode-tab {
+      flex: 1;
+      padding: 7px 10px;
+      text-align: center;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-radius: 7px;
+      transition: all 0.2s ease;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .mode-tab:hover {
+      color: #FFFFFF;
+    }
+
+    .mode-tab.active {
+      background: rgba(255, 255, 255, 0.12);
+      color: #FFFFFF;
+      font-weight: 600;
+    }
+
+    .preview-block {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .preview-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .preview-box {
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 9px;
+      padding: 12px;
+      color: #F5F5F7;
+      font-size: 12.5px;
+      line-height: 1.55;
+      min-height: 80px;
+      max-height: 160px;
+      overflow-y: auto;
+      word-break: break-all;
+      user-select: text;
+    }
+
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #FFFFFF;
+      color: #000000;
+      font-family: inherit;
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 5px 13px;
+      border-radius: 14px;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.15s;
+    }
+
+    .btn-action:active {
+      transform: scale(0.97);
+    }
+
+    .btn-action.btn-accent {
+      background: var(--accent-blue);
+      color: #FFFFFF;
+    }
+
+    .btn-action svg {
+      width: 12.5px;
+      height: 12.5px;
+      fill: currentColor;
+    }
+
+    #toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(28, 28, 30, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #FFFFFF;
+      font-size: 12px;
+      padding: 8px 18px;
+      border-radius: 20px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.25s ease;
+      z-index: 1000;
+    }
+
+    #toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="header-left">
+        <h1>小甘-SU转效果图工作台</h1>
+        <span class="header-sub">SKETCHUP TO RENDERING WORKBENCH</span>
+      </div>
+    </header>
+
+    <div class="main-layout" id="mainLayout">
+      <button class="floating-expand-btn" id="btnFloatingExpand" title="展开全局控制面板">
+        <svg width="10" height="12" viewBox="0 0 8 10" fill="currentColor"><path d="M1 1L7 5L1 9Z"/></svg>
+        <span>参数面板</span>
+      </button>
+
+      <!-- 侧边栏：紧凑型全局控制面板 -->
+      <div class="sidebar-wrapper" id="sidebarWrapper">
+        <div class="glass-card">
+          <div class="card-title">
+            <div class="card-title-left">
+              <span>全局控制面板</span>
+              <span class="card-title-badge">Parameters</span>
+            </div>
+            <button class="btn-collapse-triangle" id="btnCollapseSidebar" title="收起隐藏控制面板">
+              <svg viewBox="0 0 8 10"><path d="M7 1L1 5L7 9Z"/></svg>
+            </button>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="spaceInput">
+              <span>空间类型 (自定义输入)</span>
+              <span class="form-label-hint">不填则不限</span>
+            </label>
+            <input type="text" id="spaceInput" placeholder="如：极简客厅、买手店、茶室...">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">
+              <span>材质质感表现 (多选，按底图上材质)</span>
+              <span class="form-label-hint">勾选生效</span>
+            </label>
+            <div class="checkbox-grid">
+              <label class="checkbox-chip">
+                <input type="checkbox" name="texture" value="matte">
+                <div class="custom-box"><svg viewBox="0 0 10 10"><polyline points="1.5 5 4 7.5 8.5 2"/></svg></div>
+                <div class="chip-text">
+                  <span class="chip-title">哑光细腻质感</span>
+                  <span class="chip-desc">温润无刺眼反光，墙面/硬装平整自然</span>
+                </div>
+              </label>
+
+              <label class="checkbox-chip">
+                <input type="checkbox" name="texture" value="slight_reflection">
+                <div class="custom-box"><svg viewBox="0 0 10 10"><polyline points="1.5 5 4 7.5 8.5 2"/></svg></div>
+                <div class="chip-text">
+                  <span class="chip-title">地面与台面微反光</span>
+                  <span class="chip-desc">柔和倒影与平滑光泽，突出地面平整度</span>
+                </div>
+              </label>
+
+              <label class="checkbox-chip">
+                <input type="checkbox" name="texture" value="stone_wood">
+                <div class="custom-box"><svg viewBox="0 0 10 10"><polyline points="1.5 5 4 7.5 8.5 2"/></svg></div>
+                <div class="chip-text">
+                  <span class="chip-title">石材与木质感分色</span>
+                  <span class="chip-desc">按底图色块分别赋予石材与木质，分界严谨</span>
+                </div>
+              </label>
+
+              <label class="checkbox-chip">
+                <input type="checkbox" name="texture" value="rough_wall">
+                <div class="custom-box"><svg viewBox="0 0 10 10"><polyline points="1.5 5 4 7.5 8.5 2"/></svg></div>
+                <div class="chip-text">
+                  <span class="chip-title">立面轻微凹凸肌理</span>
+                  <span class="chip-desc">墙面微颗粒手工质感，杜绝生硬假平</span>
+                </div>
+              </label>
+
+              <label class="checkbox-chip">
+                <input type="checkbox" name="texture" value="fabric_soft">
+                <div class="custom-box"><svg viewBox="0 0 10 10"><polyline points="1.5 5 4 7.5 8.5 2"/></svg></div>
+                <div class="chip-text">
+                  <span class="chip-title">软包与织物真实触感</span>
+                  <span class="chip-desc">仅对底图沙发/床品赋予细腻布料质地</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">
+              <span>光源与光影氛围 (多选组合打光)</span>
+              <span class="form-label-hint">勾选生效</span>
+            </label>
+            <div class="checkbox-grid">
+              <label class="checkbox-chip">
+                <input type="checkbox" name="lighting" value="commercial_spot">
+                <div class="custom-box"><svg viewBox="0 0 10 10"><polyline points="1.5 5 4 7.5 8.5 2"/></svg></div>
+                <div class="chip-text">
+                  <span class="chip-title">商业射灯与洗墙光</span>
+                  <span class="chip-desc">光斑干净利落，立面明暗层次清晰</span>
+                </div>
+              </label>
+
+              <label class="checkbox-chip">
+                <input type="checkbox" name="lighting" value="hidden_light">
+                <div class="custom-box"><svg viewBox="0 0 10 10"><polyline points="1.5 5 4 7.5 8.5 2"/></svg></div>
+                <div class="chip-text">
+                  <span class="chip-title">暗藏线形灯带</span>
+                  <span class="chip-desc">天花/踢脚暗槽柔和泛光，无刺眼直射</span>
+                </div>
+              </label>
+
+              <label class="checkbox-chip">
+                <input type="checkbox" name="lighting" value="bright_ambient">
+                <div class="custom-box"><svg viewBox="0 0 10 10"><polyline points="1.5 5 4 7.5 8.5 2"/></svg></div>
+                <div class="chip-text">
+                  <span class="chip-title">通透明快环境光</span>
+                  <span class="chip-desc">空间整体透亮均匀，无死黑阴影</span>
+                </div>
+              </label>
+
+              <label class="checkbox-chip">
+                <input type="checkbox" name="lighting" value="natural_side">
+                <div class="custom-box"><svg viewBox="0 0 10 10"><polyline points="1.5 5 4 7.5 8.5 2"/></svg></div>
+                <div class="chip-text">
+                  <span class="chip-title">窗边柔和自然采光</span>
+                  <span class="chip-desc">侧向自然漫射光，形成柔和阴影过渡</span>
+                </div>
+              </label>
+
+              <label class="checkbox-chip">
+                <input type="checkbox" name="lighting" value="warm_cozy">
+                <div class="custom-box"><svg viewBox="0 0 10 10"><polyline points="1.5 5 4 7.5 8.5 2"/></svg></div>
+                <div class="chip-text">
+                  <span class="chip-title">温馨暖调光影</span>
+                  <span class="chip-desc">色温偏暖，增强室内放松氛围感</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="clutterSelect">底图结构保护 (防止模型胡乱改动)</label>
+            <div class="select-wrapper">
+              <select id="clutterSelect">
+                <option value="none">-- 默认无 (基础保底) --</option>
+                <option value="strict_empty">完全保持底图干净 (严禁多加摆件绿植道具)</option>
+                <option value="strict_shape">严格锁定原图轮廓 (仅在模型形体内渲染材质)</option>
+              </select>
+              <div class="select-chevron">
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="#FFFFFF" stroke-width="1.6"><path d="M1 1L5 5L9 1"/></svg>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="customInput">额外补充要求 (选填，直接拼接)</label>
+            <textarea id="customInput" placeholder="如：地面色调偏深、金属为黄铜拉丝..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧：工作区与提示词交付 -->
+      <div class="workspace-column">
+        <div class="glass-card canvas-card">
+          <div class="card-title">
+            <span>SU 底图交互标注与多图导出</span>
+            <span class="card-title-badge">Ultra-Large Canvas</span>
+          </div>
+
+          <div class="canvas-toolbar">
+            <div class="toolbar-left">
+              <label class="tool-btn" style="cursor:pointer;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                上传底图
+                <input type="file" id="fileUploader" accept="image/*" style="display: none;">
+              </label>
+
+              <!-- 平移抓手 -->
+              <button class="tool-btn" id="btnModePan" title="平移画布 (快捷键：按住空格键或按鼠标中键拖拽)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+                抓手平移
+              </button>
+
+              <button class="tool-btn" id="btnModeTag">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><text x="12" y="16" font-size="11" text-anchor="middle" fill="currentColor" stroke="none">A</text></svg>
+                代号标记 (A1..)
+              </button>
+
+              <button class="tool-btn" id="btnModeFreeLasso">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+                自由套索
+              </button>
+
+              <button class="tool-btn" id="btnModePolyLasso">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/></svg>
+                多边形套索
+              </button>
+
+              <div id="polyActions" style="display: none; align-items: center; gap: 6px;">
+                <button class="tool-btn tool-btn-finish" id="btnFinishPoly">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  闭合区域
+                </button>
+                <button class="tool-btn tool-btn-cancel" id="btnCancelPoly">取消本次</button>
+              </div>
+
+              <!-- 参考图底图模式 -->
+              <div class="bg-mode-capsule" title="切换图2底图模式：黑白线稿降噪能保留100%空间线框同时让彩色标注反差最大化">
+                <span class="bg-mode-option active" data-bg="grayscale">黑白线稿降噪(推荐)</span>
+                <span class="bg-mode-option" data-bg="original">原色底图</span>
+              </div>
+
+              <div class="color-swatches">
+                <div class="color-swatch active" data-color="#0A84FF" title="蓝色蒙版" style="background:#0A84FF;"></div>
+                <div class="color-swatch" data-color="#30D158" title="绿色蒙版" style="background:#30D158;"></div>
+                <div class="color-swatch" data-color="#FF9F0A" title="橙色蒙版" style="background:#FF9F0A;"></div>
+                <div class="color-swatch" data-color="#BF5AF2" title="紫色蒙版" style="background:#BF5AF2;"></div>
+                <div class="color-swatch" data-color="#FF375F" title="红色蒙版" style="background:#FF375F;"></div>
+              </div>
+            </div>
+
+            <div class="toolbar-right">
+              <div id="exportActionGroup" style="display: none; align-items: center; gap: 6px;">
+                <!-- 一键导出ZIP打包文件（含图1、图2与提示词MD） -->
+                <button class="tool-btn" id="btnExportZip" title="一键将图1、图2与完整Markdown提示词打包下载为ZIP" style="background: rgba(48, 209, 88, 0.2); border-color: var(--accent-green); color: var(--accent-green); font-weight: 600;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  一键打包下载 (.zip)
+                </button>
+                <button class="tool-btn" id="btnExportAll" title="一键导出两张对齐命名的图纸" style="background: rgba(10, 132, 255, 0.2); border-color: var(--accent-blue);">导出双图</button>
+                <button class="tool-btn" id="btnExportClean" title="导出不带任何标记的纯净原图">图1(原底图)</button>
+                <button class="tool-btn" id="btnExportAnnotated" title="导出带代号与高亮色彩蒙版的标记图">图2(标记图)</button>
+              </div>
+              <button class="tool-btn" id="btnClearLabels">清空标记</button>
+            </div>
+          </div>
+
+          <!-- 画布与右侧图例清单左右并列容器 -->
+          <div class="canvas-stage-wrapper no-labels" id="canvasStageWrapper">
+            <div class="canvas-viewport" id="canvasContainer">
+              <div class="empty-placeholder" id="emptyPlaceholder" onclick="document.getElementById('fileUploader').click()">
+                <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span>点击或拖拽上传 SketchUp 截图 / 线稿底图</span>
+              </div>
+              <canvas id="drawingCanvas"></canvas>
+
+              <div class="zoom-hud" id="zoomHud" style="display: none;">
+                <button class="zoom-btn" id="btnZoomOut" title="缩小">-</button>
+                <span class="zoom-text" id="zoomValText">100%</span>
+                <button class="zoom-btn" id="btnZoomIn" title="放大">+</button>
+                <button class="zoom-btn" id="btnZoomReset" title="适应窗口" style="font-size: 11px; width: auto; padding: 0 4px;">1:1</button>
+              </div>
+            </div>
+
+            <!-- 放置在画布右侧的标注图例清单卡片 -->
+            <div class="labels-panel" id="labelsPanel" style="display:none;">
+              <div class="labels-panel-header">
+                <div class="labels-panel-title">
+                  <span>标注图例清单</span>
+                  <span class="labels-count-badge" id="labelsCountBadge">0 个对象</span>
+                </div>
+                <span class="labels-panel-hint">修改说明将实时并入下方提示词</span>
+              </div>
+              <div class="labels-list-scroll" id="labelsList"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 提示词交付区 -->
+        <div class="glass-card">
+          <div class="card-title">
+            <span>提示词交付输出</span>
+            <span class="card-title-badge">Dual-Mode</span>
+          </div>
+
+          <div class="mode-tabs">
+            <div class="mode-tab active" data-mode="render">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              模式 1：真实渲染 (V-Ray/Corona)
+            </div>
+            <div class="mode-tab" data-mode="photo">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              模式 2：真实摄影照片 (实拍质感)
+            </div>
+          </div>
+
+          <div class="preview-block">
+            <div class="preview-header">
+              <span class="preview-label" id="zhLabel">中文提示词预览 (色彩蒙版与代号双锚定)</span>
+              <button class="btn-action" id="copyZhBtn">
+                <svg viewBox="0 0 24 24"><path d="M16 1H4C2.9 1 2 1.9 2 3v14h2V3h12V1zm3 4H8C6.9 4 6 4.9 6 6v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H8V6h11v14z"/></svg>
+                复制中文
+              </button>
+            </div>
+            <div class="preview-box" id="previewZh"></div>
+          </div>
+
+          <div class="preview-block">
+            <div class="preview-header">
+              <span class="preview-label" id="enLabel">英文提示词预览 (Color Mask & Tag Anchored)</span>
+              <button class="btn-action btn-accent" id="copyEnBtn">
+                <svg viewBox="0 0 24 24"><path d="M16 1H4C2.9 1 2 1.9 2 3v14h2V3h12V1zm3 4H8C6.9 4 6 4.9 6 6v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H8V6h11v14z"/></svg>
+                复制英文
+              </button>
+            </div>
+            <div class="preview-box" id="previewEn"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast">已复制到剪贴板</div>
+
+  <script>
+    (function () {
+      let currentMode = 'render';
+      let drawTool = 'none'; 
+      let activeColor = '#0A84FF';
+      let tagCounter = 1;
+      let labels = [];
+      let referenceBgMode = 'grayscale';
+
+      const COLOR_MAP = {
+        '#0A84FF': { zh: '蓝色', en: 'Blue' },
+        '#30D158': { zh: '绿色', en: 'Green' },
+        '#FF9F0A': { zh: '橙色', en: 'Orange' },
+        '#BF5AF2': { zh: '紫色', en: 'Purple' },
+        '#FF375F': { zh: '红色', en: 'Red' }
+      };
+
+      let bgImage = null;
+      let isDrawingFree = false;
+      let freePoints = [];
+      let polyPoints = [];
+      let mouseCanvasPos = { x: 0, y: 0 };
+
+      let scale = 1;
+      let panX = 0;
+      let panY = 0;
+      let isPanning = false;
+      let panStartX = 0;
+      let panStartY = 0;
+      let isSpacePressed = false;
+
+      const mainLayout = document.getElementById('mainLayout');
+      const btnCollapseSidebar = document.getElementById('btnCollapseSidebar');
+      const btnFloatingExpand = document.getElementById('btnFloatingExpand');
+      const canvas = document.getElementById('drawingCanvas');
+      const ctx = canvas.getContext('2d');
+      const container = document.getElementById('canvasContainer');
+      const canvasStageWrapper = document.getElementById('canvasStageWrapper');
+      const emptyPlaceholder = document.getElementById('emptyPlaceholder');
+      const fileUploader = document.getElementById('fileUploader');
+      const labelsPanel = document.getElementById('labelsPanel');
+      const labelsList = document.getElementById('labelsList');
+      const labelsCountBadge = document.getElementById('labelsCountBadge');
+      const exportActionGroup = document.getElementById('exportActionGroup');
+      const btnExportZip = document.getElementById('btnExportZip');
+      const btnExportAll = document.getElementById('btnExportAll');
+      const btnExportClean = document.getElementById('btnExportClean');
+      const btnExportAnnotated = document.getElementById('btnExportAnnotated');
+      const polyActions = document.getElementById('polyActions');
+      const btnFinishPoly = document.getElementById('btnFinishPoly');
+      const btnCancelPoly = document.getElementById('btnCancelPoly');
+      const zoomHud = document.getElementById('zoomHud');
+      const zoomValText = document.getElementById('zoomValText');
+      const btnZoomIn = document.getElementById('btnZoomIn');
+      const btnZoomOut = document.getElementById('btnZoomOut');
+      const btnZoomReset = document.getElementById('btnZoomReset');
+      const btnModePan = document.getElementById('btnModePan');
+
+      const DICTIONARY = {
+        texture: {
+          matte: {
+            zh: "材质呈现平整温润的哑光质感，无刺眼反光，严格依据底图分块上色，杜绝全屏材质混淆",
+            en: "smooth matte tactile textures applied strictly to corresponding surfaces of Image 1 without glare or material spillover"
+          },
+          slight_reflection: {
+            zh: "地面与台面呈现柔和微弱的倒影与真实反光光泽，表面平整细腻",
+            en: "subtle realistic reflections and soft smooth sheen on floor and countertop surfaces based on Image 1 layout"
+          },
+          stone_wood: {
+            zh: "根据底图不同色块分别赋予真实的石材与细腻木饰面质感，各部件材质分界清晰严谨",
+            en: "realistic stone surfaces and fine wood textures assigned strictly to distinct components of Image 1 with crisp boundaries"
+          },
+          rough_wall: {
+            zh: "墙面呈现轻微自然的质朴微凹凸手工肌理，杜绝塑料感与生硬假平",
+            en: "subtle organic tactile bump and micro-texture on wall surfaces, natural architectural finish"
+          },
+          fabric_soft: {
+            zh: "仅针对底图中的软包与家具体块赋予细腻真实的织物与布料质地",
+            en: "refined fabric weave and realistic upholstery texture mapped exclusively onto soft furniture volumes in Image 1"
+          }
+        },
+        lighting: {
+          commercial_spot: {
+            zh: "商业射灯与重点洗墙照明，光斑干净利落，立面明暗层次清晰",
+            en: "commercial spotlights and clean wall-washing lighting, crisp beam falloff and well-defined shadow hierarchy"
+          },
+          hidden_light: {
+            zh: "天花与柜体暗藏线形灯槽发光，出光均匀，营造高质感间接漫射光",
+            en: "warm linear recessed cove lighting under cabinets and ceilings, uniform indirect glow"
+          },
+          bright_ambient: {
+            zh: "整体通透明亮的环境泛光照明，空间明快清晰，无死黑阴影",
+            en: "bright, clean, and evenly illuminated ambient lighting, clear visibility with zero crushed black shadows"
+          },
+          natural_side: {
+            zh: "窗边柔和侧向自然漫射光，冷暖对比与光影过渡真实柔顺",
+            en: "soft lateral natural daylight from window openings, smooth realistic shadow transitions"
+          },
+          warm_cozy: {
+            zh: "温馨舒适的暖调室内光影，明暗过渡平滑自然",
+            en: "cozy warm interior ambient lighting with gentle and natural contrast"
+          }
+        },
+        clutter: {
+          strict_empty: {
+            zh: "绝对红线：完全保持图1原样，严禁凭空添加绿植、摆件、书籍或多余道具，保持画面绝对纯净",
+            en: "absolute constraint: strictly follow Image 1, completely forbid generating extra decorative props, books, plants, or clutter"
+          },
+          strict_shape: {
+            zh: "绝对红线：严禁改变图1固有的家具形体、墙体门窗与透视结构，只能在原模型轮廓内进行光影和材质写实化渲染",
+            en: "absolute constraint: do not alter furniture shapes, wall openings, or perspective geometry from Image 1; purely render realistic textures and light onto the existing structure"
+          }
+        }
+      };
+
+      const BASE_RENDER_ZH = "顶级建筑表现效果图，物理真实光追计算，V-Ray/Corona渲染风格，真实次表面散射与各向异性高光，8k高精度。绝对红线：严格锁定原始底图的空间透视与几何体块，严禁改动硬装结构与家具形体。";
+      const BASE_RENDER_EN = "Top-tier architectural visualization, accurate physical ray-tracing calculations, V-Ray and Corona rendering style, realistic subsurface scattering and specular falloff, 8k ultra-detailed. Absolute constraint: strictly preserve the original perspective geometry, spatial volumes, and structural layout of Image 1.";
+
+      const BASE_PHOTO_ZH = "真实建筑室内实景摄影照片，哈苏中画幅相机拍摄，24mm移轴广角镜头，真实光学散景与微弱传感器噪点，色彩真实通透，无CG渲染塑料假感。绝对红线：严格按照底图视角还原真实实景空间，严禁改变原图透视与建筑体块。";
+      const BASE_PHOTO_EN = "Authentic architectural interior photography shot on Hasselblad medium format camera, 24mm tilt-shift lens, natural optical perspective, realistic subtle ISO grain, pristine color science, zero CG look, completely photorealistic actual building photograph. Absolute constraint: strictly adhere to the perspective alignment and spatial volumes of Image 1.";
+
+      const spaceInput = document.getElementById('spaceInput');
+      const clutterSelect = document.getElementById('clutterSelect');
+      const customInput = document.getElementById('customInput');
+      const previewZh = document.getElementById('previewZh');
+      const previewEn = document.getElementById('previewEn');
+      const copyZhBtn = document.getElementById('copyZhBtn');
+      const copyEnBtn = document.getElementById('copyEnBtn');
+      const toast = document.getElementById('toast');
+      const modeTabs = document.querySelectorAll('.mode-tab');
+      const zhLabel = document.getElementById('zhLabel');
+      const enLabel = document.getElementById('enLabel');
+
+      let toastTimer = null;
+
+      function setSidebarState(collapsed) {
+        if (collapsed) {
+          mainLayout.classList.add('sidebar-collapsed');
+        } else {
+          mainLayout.classList.remove('sidebar-collapsed');
+        }
+        setTimeout(() => {
+          if (bgImage) fitCanvasToViewport();
+        }, 320);
+      }
+
+      btnCollapseSidebar.addEventListener('click', () => setSidebarState(true));
+      btnFloatingExpand.addEventListener('click', () => setSidebarState(false));
+
+      // 1. 底图加载
+      fileUploader.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          const img = new Image();
+          img.onload = function() {
+            bgImage = img;
+            canvas.width = img.width;
+            canvas.height = img.height;
+            canvas.style.display = 'block';
+            emptyPlaceholder.style.display = 'none';
+            exportActionGroup.style.display = 'inline-flex';
+            zoomHud.style.display = 'flex';
+
+            fitCanvasToViewport();
+            redrawCanvas();
+            updatePreviews();
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+
+      function applyTransform() {
+        canvas.style.transformOrigin = '0 0';
+        canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+        zoomValText.textContent = `${Math.round(scale * 100)}%`;
+      }
+
+      function fitCanvasToViewport() {
+        if (!bgImage) return;
+        const rect = container.getBoundingClientRect();
+        const padding = 20;
+        const availableW = rect.width - padding * 2;
+        const availableH = rect.height - padding * 2;
+
+        const scaleX = availableW / bgImage.width;
+        const scaleY = availableH / bgImage.height;
+        scale = Math.min(scaleX, scaleY, 1.2);
+
+        panX = (rect.width - bgImage.width * scale) / 2;
+        panY = (rect.height - bgImage.height * scale) / 2;
+        applyTransform();
+      }
+
+      function screenToCanvas(screenX, screenY) {
+        const containerRect = container.getBoundingClientRect();
+        const clientRelX = screenX - containerRect.left;
+        const clientRelY = screenY - containerRect.top;
+        return {
+          x: (clientRelX - panX) / scale,
+          y: (clientRelY - panY) / scale
+        };
+      }
+
+      function hexToRgba(hex, alpha) {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      }
+
+      function getPolygonCenter(points) {
+        let x = 0, y = 0;
+        points.forEach(p => { x += p.x; y += p.y; });
+        return { x: x / points.length, y: y / points.length };
+      }
+
+      function drawBaseLayer(targetCtx, w, h, isGrayscale) {
+        if (!bgImage) return;
+        if (isGrayscale) {
+          targetCtx.save();
+          targetCtx.filter = 'grayscale(100%) contrast(110%) brightness(95%)';
+          targetCtx.drawImage(bgImage, 0, 0, w, h);
+          targetCtx.restore();
+        } else {
+          targetCtx.drawImage(bgImage, 0, 0, w, h);
+        }
+      }
+
+      // 2. 物理坐标系重绘
+      function redrawCanvas() {
+        if (!bgImage) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        drawBaseLayer(ctx, canvas.width, canvas.height, referenceBgMode === 'grayscale');
+
+        const baseRadius = Math.max(14, Math.round(canvas.width / 75));
+        const baseLineWidth = Math.max(2, Math.round(canvas.width / 500));
+
+        labels.forEach(item => {
+          ctx.save();
+          if (item.type === 'tag') {
+            ctx.beginPath();
+            ctx.arc(item.x, item.y, baseRadius, 0, Math.PI * 2);
+            ctx.fillStyle = item.color;
+            ctx.fill();
+            ctx.lineWidth = baseLineWidth;
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.stroke();
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = `bold ${Math.round(baseRadius * 0.85)}px -apple-system, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(item.code, item.x, item.y);
+          } else if (item.points && item.points.length > 2) {
+            ctx.beginPath();
+            ctx.moveTo(item.points[0].x, item.points[0].y);
+            for (let i = 1; i < item.points.length; i++) {
+              ctx.lineTo(item.points[i].x, item.points[i].y);
+            }
+            ctx.closePath();
+            ctx.fillStyle = hexToRgba(item.color, 0.35);
+            ctx.fill();
+            ctx.lineWidth = baseLineWidth;
+            ctx.strokeStyle = item.color;
+            ctx.stroke();
+
+            const center = getPolygonCenter(item.points);
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, baseRadius, 0, Math.PI * 2);
+            ctx.fillStyle = item.color;
+            ctx.fill();
+            ctx.lineWidth = baseLineWidth;
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.stroke();
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = `bold ${Math.round(baseRadius * 0.85)}px -apple-system, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(item.code, center.x, center.y);
+          }
+          ctx.restore();
+        });
+
+        if (drawTool === 'free_lasso' && isDrawingFree && freePoints.length > 1) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(freePoints[0].x, freePoints[0].y);
+          for (let i = 1; i < freePoints.length; i++) {
+            ctx.lineTo(freePoints[i].x, freePoints[i].y);
+          }
+          ctx.strokeStyle = activeColor;
+          ctx.lineWidth = baseLineWidth;
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        if (drawTool === 'poly_lasso' && polyPoints.length > 0) {
+          ctx.save();
+          polyPoints.forEach((p, idx) => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, idx === 0 ? baseLineWidth * 2.5 : baseLineWidth * 2, 0, Math.PI * 2);
+            ctx.fillStyle = idx === 0 ? '#30D158' : '#FFFFFF';
+            ctx.fill();
+            ctx.strokeStyle = activeColor;
+            ctx.lineWidth = baseLineWidth;
+            ctx.stroke();
+          });
+
+          ctx.beginPath();
+          ctx.moveTo(polyPoints[0].x, polyPoints[0].y);
+          for (let i = 1; i < polyPoints.length; i++) {
+            ctx.lineTo(polyPoints[i].x, polyPoints[i].y);
+          }
+          ctx.strokeStyle = activeColor;
+          ctx.lineWidth = baseLineWidth;
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.setLineDash([Math.round(baseLineWidth * 2.5), Math.round(baseLineWidth * 2.5)]);
+          const lastPoint = polyPoints[polyPoints.length - 1];
+          ctx.moveTo(lastPoint.x, lastPoint.y);
+          ctx.lineTo(mouseCanvasPos.x, mouseCanvasPos.y);
+
+          if (polyPoints.length >= 2) {
+            ctx.lineTo(polyPoints[0].x, polyPoints[0].y);
+          }
+
+          ctx.strokeStyle = activeColor;
+          ctx.lineWidth = baseLineWidth;
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      // 3. 滚轮阻断平移缩放
+      container.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!bgImage) return;
+
+        const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
+        const newScale = Math.min(Math.max(scale * zoomFactor, 0.15), 6.0);
+
+        const containerRect = container.getBoundingClientRect();
+        const mouseX = e.clientX - containerRect.left;
+        const mouseY = e.clientY - containerRect.top;
+
+        panX = mouseX - (mouseX - panX) * (newScale / scale);
+        panY = mouseY - (mouseY - panY) * (newScale / scale);
+        scale = newScale;
+
+        applyTransform();
+      }, { passive: false });
+
+      window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && !isSpacePressed && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+          isSpacePressed = true;
+          container.classList.add('panning');
+        }
+      });
+
+      window.addEventListener('keyup', (e) => {
+        if (e.code === 'Space') {
+          isSpacePressed = false;
+          if (drawTool !== 'pan') {
+            container.classList.remove('panning');
+          }
+        }
+      });
+
+      // 4. 鼠标按下分流
+      container.addEventListener('mousedown', function(e) {
+        if (!bgImage) return;
+
+        if (drawTool === 'pan' || isSpacePressed || e.button === 1) {
+          isPanning = true;
+          panStartX = e.clientX - panX;
+          panStartY = e.clientY - panY;
+          container.classList.add('panning');
+          return;
+        }
+
+        if (e.button !== 0) return;
+
+        if (drawTool === 'none') {
+          showToast("请先在上方工具栏选择：代号标记、自由套索或多边形套索");
+          return;
+        }
+
+        const pos = screenToCanvas(e.clientX, e.clientY);
+        if (pos.x < 0 || pos.y < 0 || pos.x > canvas.width || pos.y > canvas.height) return;
+
+        const colorMeta = COLOR_MAP[activeColor] || { zh: '彩色', en: 'Colored' };
+
+        if (drawTool === 'tag') {
+          const code = 'A' + tagCounter++;
+          const defaultDesc = prompt(`请输入 [${colorMeta.zh}代号标记 ${code}] 的对象或材质说明：`, "主体对象");
+          if (defaultDesc !== null && defaultDesc.trim() !== "") {
+            labels.push({
+              id: Date.now(),
+              type: 'tag',
+              code: code,
+              desc: defaultDesc.trim(),
+              color: activeColor,
+              colorNameZh: colorMeta.zh,
+              colorNameEn: colorMeta.en,
+              x: pos.x,
+              y: pos.y
+            });
+            renderLabelsList();
+            redrawCanvas();
+            updatePreviews();
+          }
+        } else if (drawTool === 'free_lasso') {
+          isDrawingFree = true;
+          freePoints = [pos];
+        } else if (drawTool === 'poly_lasso') {
+          if (polyPoints.length >= 3) {
+            const start = polyPoints[0];
+            const dist = Math.hypot(pos.x - start.x, pos.y - start.y);
+            if (dist <= 18) {
+              completePolyLasso();
+              return;
+            }
+          }
+          polyPoints.push(pos);
+          polyActions.style.display = 'flex';
+          redrawCanvas();
+        }
+      });
+
+      window.addEventListener('mousemove', function(e) {
+        if (isPanning) {
+          panX = e.clientX - panStartX;
+          panY = e.clientY - panStartY;
+          applyTransform();
+          return;
+        }
+
+        if (!bgImage) return;
+        mouseCanvasPos = screenToCanvas(e.clientX, e.clientY);
+
+        if (drawTool === 'free_lasso' && isDrawingFree) {
+          freePoints.push(mouseCanvasPos);
+          redrawCanvas();
+        } else if (drawTool === 'poly_lasso' && polyPoints.length > 0) {
+          redrawCanvas();
+        }
+      });
+
+      window.addEventListener('mouseup', function() {
+        if (isPanning) {
+          isPanning = false;
+          if (!isSpacePressed && drawTool !== 'pan') {
+            container.classList.remove('panning');
+          }
+          return;
+        }
+
+        if (drawTool === 'free_lasso' && isDrawingFree) {
+          isDrawingFree = false;
+          if (freePoints.length > 5) {
+            freePoints.push({ x: freePoints[0].x, y: freePoints[0].y });
+            const colorMeta = COLOR_MAP[activeColor] || { zh: '彩色', en: 'Colored' };
+            const code = 'A' + tagCounter++;
+            const defaultDesc = prompt(`已闭合！请输入 [${colorMeta.zh}半透明蒙版区域 ${code}] 的材质说明：`, "指定材质区域");
+            if (defaultDesc !== null && defaultDesc.trim() !== "") {
+              labels.push({
+                id: Date.now(),
+                type: 'area',
+                code: code,
+                desc: defaultDesc.trim(),
+                color: activeColor,
+                colorNameZh: colorMeta.zh,
+                colorNameEn: colorMeta.en,
+                points: [...freePoints]
+              });
+              renderLabelsList();
+              updatePreviews();
+            }
+          }
+          freePoints = [];
+          redrawCanvas();
+        }
+      });
+
+      container.addEventListener('dblclick', function() {
+        if (drawTool === 'poly_lasso' && polyPoints.length >= 3) {
+          completePolyLasso();
+        }
+      });
+
+      function completePolyLasso() {
+        if (polyPoints.length < 3) {
+          showToast("至少需要 3 个顶点才能形成闭合蒙版区域");
+          return;
+        }
+        const colorMeta = COLOR_MAP[activeColor] || { zh: '彩色', en: 'Colored' };
+        const code = 'A' + tagCounter++;
+        const defaultDesc = prompt(`已闭合！请输入 [${colorMeta.zh}半透明蒙版区域 ${code}] 的材质说明：`, "指定几何构件");
+        if (defaultDesc !== null && defaultDesc.trim() !== "") {
+          labels.push({
+            id: Date.now(),
+            type: 'area',
+            code: code,
+            desc: defaultDesc.trim(),
+            color: activeColor,
+            colorNameZh: colorMeta.zh,
+            colorNameEn: colorMeta.en,
+            points: [...polyPoints]
+          });
+          renderLabelsList();
+          updatePreviews();
+        }
+        polyPoints = [];
+        polyActions.style.display = 'none';
+        redrawCanvas();
+      }
+
+      function cancelPolyLasso() {
+        polyPoints = [];
+        polyActions.style.display = 'none';
+        redrawCanvas();
+        showToast("已取消本次绘制");
+      }
+
+      btnFinishPoly.addEventListener('click', completePolyLasso);
+      btnCancelPoly.addEventListener('click', cancelPolyLasso);
+
+      // 5. HUD 控制
+      btnZoomIn.addEventListener('click', () => {
+        if (!bgImage) return;
+        scale = Math.min(scale * 1.2, 6.0);
+        applyTransform();
+      });
+
+      btnZoomOut.addEventListener('click', () => {
+        if (!bgImage) return;
+        scale = Math.max(scale * 0.8, 0.15);
+        applyTransform();
+      });
+
+      btnZoomReset.addEventListener('click', () => {
+        fitCanvasToViewport();
+      });
+
+      // 6. 底图显示模式
+      document.querySelectorAll('.bg-mode-option').forEach(opt => {
+        opt.addEventListener('click', () => {
+          document.querySelectorAll('.bg-mode-option').forEach(o => o.classList.remove('active'));
+          opt.classList.add('active');
+          referenceBgMode = opt.dataset.bg;
+          redrawCanvas();
+          updatePreviews();
+          showToast(referenceBgMode === 'grayscale' ? "已切换为：黑白线稿降噪底图（空间参照清晰、标注高反差）" : "已切换为：彩色原色底图");
+        });
+      });
+
+      // 7. 工具切换
+      const btnModeTag = document.getElementById('btnModeTag');
+      const btnModeFreeLasso = document.getElementById('btnModeFreeLasso');
+      const btnModePolyLasso = document.getElementById('btnModePolyLasso');
+      const swatches = document.querySelectorAll('.color-swatch');
+
+      function clearActiveToolClasses() {
+        btnModeTag.classList.remove('active');
+        btnModeFreeLasso.classList.remove('active');
+        btnModePolyLasso.classList.remove('active');
+        btnModePan.classList.remove('active');
+        container.classList.remove('panning');
+        polyActions.style.display = 'none';
+        polyPoints = [];
+        freePoints = [];
+        redrawCanvas();
+      }
+
+      function toggleDrawTool(targetTool, targetBtn, toastMsg) {
+        if (drawTool === targetTool) {
+          drawTool = 'none';
+          clearActiveToolClasses();
+          showToast("已释放绘制工具");
+        } else {
+          clearActiveToolClasses();
+          drawTool = targetTool;
+          targetBtn.classList.add('active');
+          if (targetTool === 'pan') {
+            container.classList.add('panning');
+          }
+          showToast(toastMsg);
+        }
+      }
+
+      btnModeTag.addEventListener('click', () => {
+        toggleDrawTool('tag', btnModeTag, "已激活：代号标记模式（点击画面生成标记）");
+      });
+
+      btnModeFreeLasso.addEventListener('click', () => {
+        toggleDrawTool('free_lasso', btnModeFreeLasso, "已激活：自由套索模式（按住拖拽涂画，松开自闭合）");
+      });
+
+      btnModePolyLasso.addEventListener('click', () => {
+        toggleDrawTool('poly_lasso', btnModePolyLasso, "已激活：多边形套索模式（虚线引导，可无级放大点选）");
+      });
+
+      btnModePan.addEventListener('click', () => {
+        toggleDrawTool('pan', btnModePan, "已激活：抓手模式（按住左键平移画布）");
+      });
+
+      swatches.forEach(swatch => {
+        swatch.addEventListener('click', () => {
+          swatches.forEach(s => s.classList.remove('active'));
+          swatch.classList.add('active');
+          activeColor = swatch.dataset.color;
+        });
+      });
+
+      document.getElementById('btnClearLabels').addEventListener('click', () => {
+        if (confirm("确定要清空底图上所有的色彩蒙版与代号标记吗？")) {
+          labels = [];
+          tagCounter = 1;
+          polyPoints = [];
+          freePoints = [];
+          polyActions.style.display = 'none';
+          renderLabelsList();
+          redrawCanvas();
+          updatePreviews();
+        }
+      });
+
+      // 8. 辅助文件导出与纯原生单文件 ZIP 打包引擎（零依赖、离线可用）
+      function downloadDataUrl(dataUrl, filename) {
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = dataUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      function getCleanBaseImageDataUrl() {
+        if (!bgImage) return null;
+        const offscreen = document.createElement('canvas');
+        offscreen.width = bgImage.width;
+        offscreen.height = bgImage.height;
+        const offCtx = offscreen.getContext('2d');
+        offCtx.drawImage(bgImage, 0, 0);
+        return offscreen.toDataURL('image/png');
+      }
+
+      function getAnnotatedImageDataUrl() {
+        if (!bgImage) return null;
+        return canvas.toDataURL('image/png');
+      }
+
+      function dataUrlToUint8Array(dataUrl) {
+        const base64 = dataUrl.split(',')[1];
+        const binary = atob(base64);
+        const len = binary.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes;
+      }
+
+      // 生成结构化 Markdown 交付文档
+      function generatePromptMarkdown() {
+        const spaceVal = spaceInput.value.trim() || "未指定（以底图为准）";
+        const modeName = currentMode === 'render' ? "真实渲染模式 (V-Ray / Corona ArchViz)" : "真实摄影照片模式 (Medium Format Architectural Photography)";
+        const nowStr = new Date().toLocaleString();
+
+        let md = `# 小甘-SU转效果图工作台 · 交付方案
+
+**生成时间**：${nowStr}  
+**运行模式**：${modeName}  
+**空间类型**：${spaceVal}  
+
+---
+
+## 一、 文件清单与多图角色声明
+本打包文件包含三项核心资产，交付多模态大模型时请按以下规则严格绑定：
+1. **\`图1_修改底图.png\`**：纯净 SketchUp 空间截图，为渲染的**唯一空间几何与透视结构基准**。
+2. **\`图2_标记参考图.png\`**：包含色彩蒙版与代号徽章的引导图，**仅作为材质索引与局部修改位置指引**。
+3. **\`提示词交付说明.md\`**：本提示词与参数说明文件。
+
+> **绝对消歧红线**：图2 中的高亮色彩蒙版、线框与代号文字仅供视觉空间定位参考，**严禁**将任何彩色标记或文字绘制入最终效果图中。最终结果必须是无任何标记的真实效果图。
+
+---
+
+## 二、 色彩蒙版与代号映射清单
+`;
+
+        if (labels.length === 0) {
+          md += `*暂无局部标注，全图按全局质感与光影设定渲染。*\n`;
+        } else {
+          labels.forEach((l, idx) => {
+            const typeName = l.type === 'tag' ? `${l.colorNameZh}圆形标记点` : `半透明${l.colorNameZh}蒙版覆盖区`;
+            md += `${idx + 1}. **[${l.code}]**：${typeName} ➔ **${l.desc}**\n`;
+          });
+        }
+
+        md += `
+---
+
+## 三、 中文提示词全文 (Prompt - ZH)
+\`\`\`text
+${previewZh.textContent}
+\`\`\`
+
+---
+
+## 四、 英文专业提示词 (Prompt - EN)
+\`\`\`text
+${previewEn.textContent}
+\`\`\`
+
+---
+*Generated by 小甘-SU转效果图工作台 (SKETCHUP TO RENDERING WORKBENCH)*
+`;
+        return md;
+      }
+
+      // 纯原生简易 ZIP 打包算法（无外部依赖，零库纯 JS 实现）
+      function createSimpleZip(fileList) {
+        // CRC32 计算表
+        const crcTable = new Uint32Array(256);
+        for (let n = 0; n < 256; n++) {
+          let c = n;
+          for (let k = 0; k < 8; k++) {
+            c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+          }
+          crcTable[n] = c >>> 0;
+        }
+
+        function crc32(buf) {
+          let c = 0xFFFFFFFF;
+          for (let i = 0; i < buf.length; i++) {
+            c = (c >>> 8) ^ crcTable[(c ^ buf[i]) & 0xFF];
+          }
+          return (c ^ 0xFFFFFFFF) >>> 0;
+        }
+
+        const encoder = new TextEncoder();
+        const localHeaders = [];
+        const centralDirs = [];
+        let offset = 0;
+
+        fileList.forEach(file => {
+          const nameBytes = encoder.encode(file.name);
+          const dataBytes = file.data;
+          const crc = crc32(dataBytes);
+          const size = dataBytes.length;
+
+          // Local File Header
+          const localHeader = new Uint8Array(30 + nameBytes.length);
+          const lv = new DataView(localHeader.buffer);
+          lv.setUint32(0, 0x04034b50, true); // Local header signature
+          lv.setUint16(4, 20, true);         // Version needed
+          lv.setUint16(6, 0x0800, true);     // General purpose bit flag (UTF-8)
+          lv.setUint16(8, 0, true);          // Compression (0 = Store)
+          lv.setUint16(10, 0, true);         // Time
+          lv.setUint16(12, 0, true);         // Date
+          lv.setUint32(14, crc, true);       // CRC-32
+          lv.setUint32(18, size, true);      // Compressed size
+          lv.setUint32(22, size, true);      // Uncompressed size
+          lv.setUint16(26, nameBytes.length, true); // Filename length
+          lv.setUint16(28, 0, true);         // Extra field length
+          localHeader.set(nameBytes, 30);
+
+          localHeaders.push(localHeader, dataBytes);
+
+          // Central Directory File Header
+          const centralHeader = new Uint8Array(46 + nameBytes.length);
+          const cv = new DataView(centralHeader.buffer);
+          cv.setUint32(0, 0x02014b50, true); // Central dir signature
+          cv.setUint16(4, 20, true);         // Version made by
+          cv.setUint16(6, 20, true);         // Version needed
+          cv.setUint16(8, 0x0800, true);     // UTF-8
+          cv.setUint16(10, 0, true);         // Compression (0)
+          cv.setUint16(12, 0, true);         // Time
+          cv.setUint14 = 0;
+          cv.setUint16(14, 0, true);         // Date
+          cv.setUint32(16, crc, true);       // CRC-32
+          cv.setUint32(20, size, true);      // Compressed size
+          cv.setUint32(24, size, true);      // Uncompressed size
+          cv.setUint16(28, nameBytes.length, true); // Filename length
+          cv.setUint16(30, 0, true);         // Extra field length
+          cv.setUint16(32, 0, true);         // Comment length
+          cv.setUint16(34, 0, true);         // Disk number
+          cv.setUint16(36, 0, true);         // Internal attrs
+          cv.setUint32(38, 0, true);         // External attrs
+          cv.setUint32(42, offset, true);    // Relative offset of local header
+          centralHeader.set(nameBytes, 46);
+
+          centralDirs.push(centralHeader);
+          offset += localHeader.length + size;
+        });
+
+        const centralDirOffset = offset;
+        let centralDirSize = 0;
+        centralDirs.forEach(cd => centralDirSize += cd.length);
+
+        // End of Central Directory Record
+        const endRecord = new Uint8Array(22);
+        const ev = new DataView(endRecord.buffer);
+        ev.setUint32(0, 0x06054b50, true); // EOCD signature
+        ev.setUint16(4, 0, true);          // Number of this disk
+        ev.setUint16(6, 0, true);          // Disk where central dir starts
+        ev.setUint16(8, fileList.length, true);  // Number of central dir records on this disk
+        ev.setUint16(10, fileList.length, true); // Total number of central dir records
+        ev.setUint32(12, centralDirSize, true);  // Size of central dir
+        ev.setUint32(16, centralDirOffset, true);// Offset of start of central dir
+        ev.setUint16(20, 0, true);         // Comment length
+
+        const allParts = [...localHeaders, ...centralDirs, endRecord];
+        return new Blob(allParts, { type: 'application/zip' });
+      }
+
+      // 绑定一键打包 ZIP 下载
+      btnExportZip.addEventListener('click', () => {
+        if (!bgImage) {
+          showToast("请先上传底图再进行打包导出");
+          return;
+        }
+
+        showToast("正在组织资产打包，请稍候...");
+
+        setTimeout(() => {
+          try {
+            const cleanUrl = getCleanBaseImageDataUrl();
+            const annotatedUrl = getAnnotatedImageDataUrl();
+            const mdContent = generatePromptMarkdown();
+
+            const cleanBytes = dataUrlToUint8Array(cleanUrl);
+            const annotatedBytes = dataUrlToUint8Array(annotatedUrl);
+            const mdBytes = new TextEncoder().encode(mdContent);
+
+            const files = [
+              { name: "图1_修改底图.png", data: cleanBytes },
+              { name: "图2_标记参考图.png", data: annotatedBytes },
+              { name: "提示词交付说明.md", data: mdBytes }
+            ];
+
+            const zipBlob = createSimpleZip(files);
+            const zipUrl = URL.createObjectURL(zipBlob);
+            const link = document.createElement('a');
+            link.download = `SU转效果图_交付打包_${Date.now()}.zip`;
+            link.href = zipUrl;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(zipUrl);
+
+            showToast("ZIP 打包下载完成（含图1、图2与提示词MD）！");
+          } catch (err) {
+            console.error(err);
+            showToast("打包失败，请重试或单独导出双图");
+          }
+        }, 100);
+      });
+
+      btnExportClean.addEventListener('click', () => {
+        const url = getCleanBaseImageDataUrl();
+        if (url) {
+          downloadDataUrl(url, '图1_修改底图.png');
+          showToast("已导出 [图1_修改底图.png]");
+        }
+      });
+
+      btnExportAnnotated.addEventListener('click', () => {
+        const url = getAnnotatedImageDataUrl();
+        if (url) {
+          downloadDataUrl(url, '图2_标记参考图.png');
+          showToast("已导出 [图2_标记参考图.png]");
+        }
+      });
+
+      btnExportAll.addEventListener('click', () => {
+        const cleanUrl = getCleanBaseImageDataUrl();
+        const annotatedUrl = getAnnotatedImageDataUrl();
+        if (!cleanUrl || !annotatedUrl) return;
+
+        downloadDataUrl(cleanUrl, '图1_修改底图.png');
+        setTimeout(() => {
+          downloadDataUrl(annotatedUrl, '图2_标记参考图.png');
+          showToast("已成功依次导出 [图1_修改底图] 与 [图2_标记参考图]！");
+        }, 400);
+      });
+
+      // 9. 标注清单管理与右侧列表联动
+      function renderLabelsList() {
+        labelsList.innerHTML = '';
+        labelsCountBadge.textContent = `${labels.length} 个对象`;
+
+        if (labels.length === 0) {
+          labelsPanel.style.display = 'none';
+          canvasStageWrapper.classList.add('no-labels');
+          setTimeout(() => { if (bgImage) fitCanvasToViewport(); }, 50);
+          return;
+        }
+
+        labelsPanel.style.display = 'flex';
+        canvasStageWrapper.classList.remove('no-labels');
+
+        labels.forEach(item => {
+          const row = document.createElement('div');
+          row.className = 'label-item';
+          const typeName = item.type === 'tag' ? `${item.colorNameZh}点` : `${item.colorNameZh}蒙版`;
+          row.innerHTML = `
+            <div class="label-item-header">
+              <div class="label-badge">
+                <span class="label-color-dot" style="background:${item.color};"></span>
+                <span>[${item.code}]</span>
+                <span class="label-type-tag">${typeName}</span>
+              </div>
+              <button class="btn-icon-del" data-id="${item.id}" title="删除标注">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <input type="text" class="label-desc-input" value="${item.desc}" data-id="${item.id}" placeholder="输入构件/材质说明">
+          `;
+          labelsList.appendChild(row);
+        });
+
+        labelsList.querySelectorAll('.label-desc-input').forEach(input => {
+          input.addEventListener('input', (e) => {
+            const id = Number(e.target.dataset.id);
+            const found = labels.find(l => l.id === id);
+            if (found) {
+              found.desc = e.target.value.trim();
+              updatePreviews();
+            }
+          });
+        });
+
+        labelsList.querySelectorAll('.btn-icon-del').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const id = Number(btn.dataset.id);
+            labels = labels.filter(l => l.id !== id);
+            renderLabelsList();
+            redrawCanvas();
+            updatePreviews();
+          });
+        });
+      }
+
+      function getActiveOptions(name) {
+        const checked = document.querySelectorAll(`input[name="${name}"]:checked`);
+        const zh = [];
+        const en = [];
+        checked.forEach(cb => {
+          const item = DICTIONARY[name]?.[cb.value];
+          if (item) {
+            zh.push(item.zh);
+            en.push(item.en);
+          }
+        });
+        return { zh, en };
+      }
+
+      // 10. 提示词双模组装
+      function updatePreviews() {
+        const spaceVal = spaceInput.value.trim();
+        const clutterVal = clutterSelect.value;
+        const customText = customInput.value.trim();
+
+        const zhList = [];
+        const enList = [];
+
+        if (bgImage || labels.length > 0) {
+          const bgDescZh = referenceBgMode === 'grayscale'
+            ? "图2已对空间底图进行黑白线稿降噪处理，完整保留了墙体门窗与透视线，以高反差彩色蒙版突出显示施工修改位置。"
+            : "图2为原色彩底图叠加半透明色彩蒙版。";
+          const bgDescEn = referenceBgMode === 'grayscale'
+            ? "Image 2 presents a high-contrast desaturated/grayscale perspective framework preserving all architectural outlines, highlighting localized target modifications with saturated color masks."
+            : "Image 2 presents the colored base image overlaid with translucent color masks.";
+
+          const imageBindingZh = `【多图角色绑定与消歧规则】：本任务提供两张图片。图1为《修改底图》(纯净SU模型截图，为本次渲染的唯一空间几何结构基准)；图2为《标记参考图》(${bgDescZh}包含不同颜色的半透明高亮蒙版与代号徽章，仅作为材质指定与局部修改的位置索引)。\n绝对禁止项：图2中的彩色半透明高亮色块、边框线条与文字徽章仅供AI视觉定位参考，严禁将任何彩色标记或文字渲染到输出画面中。最终画面必须输出完全干净、无任何标注痕迹的真实空间。`;
+          const imageBindingEn = `[Multi-Image Role Binding & Anti-Leak Directive]: Two reference images are provided. Image 1 is the 'Base Image' (clean SketchUp viewport capture, serving as the sole geometric foundation); Image 2 is the 'Annotation Reference' (${bgDescEn} containing color-coded translucent overlays and alphanumeric badges solely for localization).\nStrict Negative Directive: The colored overlays, wireframes, and text tags in Image 2 are strictly reference coordinates and must NEVER be drawn or leaked into the final rendered output. The result must be a pristine, photorealistic scene completely free of annotations.`;
+
+          zhList.push(imageBindingZh);
+          enList.push(imageBindingEn);
+        }
+
+        if (spaceVal) {
+          if (currentMode === 'render') {
+            zhList.push(`${spaceVal}写实渲染表现`);
+            enList.push(`Architectural visualization of ${spaceVal}`);
+          } else {
+            zhList.push(`${spaceVal}实景摄影照片`);
+            enList.push(`Editorial interior photography of ${spaceVal}`);
+          }
+        }
+
+        if (labels.length > 0) {
+          const labelZhList = labels.map(l => {
+            const visualDescriptorZh = l.type === 'tag' ? `【${l.colorNameZh}圆形标记点 [${l.code}]】` : `【半透明${l.colorNameZh}蒙版覆盖区域 [${l.code}]】`;
+            return `参考图2中${visualDescriptorZh}指示的对应空间位置，严格渲染为：${l.desc}`;
+          });
+
+          const labelEnList = labels.map(l => {
+            const visualDescriptorEn = l.type === 'tag' ? `the [${l.colorNameEn} circular badge labeled ${l.code}]` : `the [translucent ${l.colorNameEn} mask area labeled ${l.code}]`;
+            return `Corresponding to ${visualDescriptorEn} in Image 2, render strictly as: ${l.desc}`;
+          });
+
+          zhList.push(`色彩标注与材质映射规范：\n` + labelZhList.map((item, idx) => `  ${idx + 1}. ${item}`).join('；\n'));
+          enList.push(`Color-Coded Spatial Directives:\n` + labelEnList.map((item, idx) => `  ${idx + 1}. ${item}`).join(';\n'));
+        }
+
+        const textures = getActiveOptions('texture');
+        if (textures.zh.length > 0) {
+          zhList.push(textures.zh.join("；"));
+          enList.push(textures.en.join("; "));
+        }
+
+        const lightings = getActiveOptions('lighting');
+        if (lightings.zh.length > 0) {
+          zhList.push(lightings.zh.join("；"));
+          enList.push(lightings.en.join("; "));
+        }
+
+        if (clutterVal !== "none" && DICTIONARY.clutter[clutterVal]) {
+          zhList.push(DICTIONARY.clutter[clutterVal].zh);
+          enList.push(DICTIONARY.clutter[clutterVal].en);
+        }
+
+        if (currentMode === 'render') {
+          zhList.push(BASE_RENDER_ZH);
+          enList.push(BASE_RENDER_EN);
+        } else {
+          zhList.push(BASE_PHOTO_ZH);
+          enList.push(BASE_PHOTO_EN);
+        }
+
+        if (customText) {
+          zhList.push(customText);
+          enList.push(customText);
+        }
+
+        previewZh.textContent = zhList.join("，\n\n");
+        previewEn.textContent = enList.join(",\n\n");
+      }
+
+      modeTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          modeTabs.forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          currentMode = tab.dataset.mode;
+
+          if (currentMode === 'render') {
+            zhLabel.textContent = "中文提示词预览 (模式1：真实渲染 - 颜色与代号双锚定)";
+            enLabel.textContent = "英文提示词预览 (ArchViz Render - Color Mask & Tag Anchored)";
+          } else {
+            zhLabel.textContent = "中文提示词预览 (模式2：真实摄影照片 - 颜色与代号双锚定)";
+            enLabel.textContent = "英文提示词预览 (Real Photography - Color Mask & Tag Anchored)";
+          }
+          updatePreviews();
+        });
+      });
+
+      document.querySelectorAll('.checkbox-chip').forEach(chip => {
+        chip.addEventListener('click', (e) => {
+          e.preventDefault();
+          const checkbox = chip.querySelector('input');
+          checkbox.checked = !checkbox.checked;
+          if (checkbox.checked) {
+            chip.classList.add('active');
+          } else {
+            chip.classList.remove('active');
+          }
+          updatePreviews();
+        });
+      });
+
+      function showToast(text) {
+        toast.textContent = text || "已复制到剪贴板";
+        toast.classList.add('show');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          toast.classList.remove('show');
+        }, 2200);
+      }
+
+      function copyText(text) {
+        if (!text) return;
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).then(() => showToast()).catch(() => fallbackCopy(text));
+        } else {
+          fallbackCopy(text);
+        }
+      }
+
+      function fallbackCopy(text) {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try {
+          document.execCommand('copy');
+          showToast();
+        } catch (e) {}
+        document.body.removeChild(ta);
+      }
+
+      spaceInput.addEventListener('input', updatePreviews);
+      clutterSelect.addEventListener('change', updatePreviews);
+      customInput.addEventListener('input', updatePreviews);
+
+      copyZhBtn.addEventListener('click', () => copyText(previewZh.textContent));
+      copyEnBtn.addEventListener('click', () => copyText(previewEn.textContent));
+
+      updatePreviews();
+    })();
+  </script>
+</body>
+</html>
